@@ -39,13 +39,14 @@ The UI also visualizes heap state (bar/trend) instead of showing raw `GC.stat` d
 2. Runtime exceptions do not automatically eliminate a player (unless GC is triggered).
 3. Timeout (`>3s`) is handled by JS-side timeout control and worker termination.
 4. Each executed turn reports allocation delta in the game log:
-   - `alloc_delta = GC.stat[:total_allocated_objects]` difference before/after the line.
+   - `alloc_delta` is measured in the gameplay worker around the `run_line` command call.
+   - This measurement includes Ruby-side response construction/serialization after `eval` (for example `inspect`, hash building, and JSON generation), not only user-code `eval`.
 
 ## 5. UI Requirements
 
 1. Setup panel:
    - Player names textarea
-   - Auto-rule text for `n`
+   - Detailed GC log toggle (default OFF)
    - Start / Reset buttons
 2. Turn panel:
    - Current player
@@ -71,6 +72,7 @@ The UI also visualizes heap state (bar/trend) instead of showing raw `GC.stat` d
 4. Current `GC.stat[:count]` is shown as `GC count`.
 5. `heap_available_slots` numeric value is shown.
 6. Recent turns are shown as a compact trend bar chart.
+7. When Detailed GC log is ON, extra GC/heap metrics are shown as a detail-card grid.
 
 ## 7. Technical Constraints
 

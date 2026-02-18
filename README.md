@@ -36,9 +36,14 @@ Open `http://localhost:8000` in your browser.
 8. Game log shows per-turn allocated object delta (`+N objects`).
 9. Syntax checks run in a separate Ruby VM worker.
 
+Allocation note:
+- `+N objects` is measured around the worker `run_line` call.
+- It includes Ruby-side result packaging/serialization after `eval`, not only the user expression body.
+
 ## Heap Panel
 
 - Right panel shows heap as a live/free bar + recent trend.
 - Live/free are shown only as integer percentages.
 - Current `GC count` is shown.
 - `heap_available_slots` is shown as a numeric value.
+- If Detailed GC log is ON at setup, extra GC/heap metrics are shown as detail cards.

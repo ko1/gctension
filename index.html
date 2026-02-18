@@ -72,6 +72,15 @@
       background: #fff;
     }
 
+    input[type="checkbox"] {
+      width: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      margin: 0;
+    }
+
     textarea {
       min-height: 80px;
       resize: vertical;
@@ -216,6 +225,64 @@
       border-radius: 2px 2px 0 0;
       background: linear-gradient(180deg, #ffbf66, #63b3ff);
       transition: height 160ms ease, opacity 160ms ease;
+    }
+
+    .heap-detail {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(168, 214, 255, 0.24);
+      background:
+        radial-gradient(150px 50px at 92% 6%, rgba(92, 196, 255, 0.24), transparent 70%),
+        rgba(17, 28, 43, 0.8);
+    }
+
+    .heap-detail-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 10px;
+      color: #c6d8ef;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .heap-detail-hint {
+      color: #9cb4cf;
+      text-transform: none;
+      letter-spacing: 0;
+      text-align: right;
+    }
+
+    .heap-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .heap-detail-card {
+      padding: 7px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    }
+
+    .heap-detail-card .label {
+      display: block;
+      font-size: 10px;
+      color: #9fb8d6;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .heap-detail-card .value {
+      display: block;
+      margin-top: 3px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #f4f8ff;
     }
 
     @media (max-width: 860px) {
@@ -480,7 +547,10 @@
       <textarea id="players">Alice
 Bob
 Carol</textarea>
-      <div class="meta" style="margin-top:10px;">Auto rule: <code>n = max(1, players - 1)</code></div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+        <input id="detailMode" type="checkbox">
+        <span>Detailed GC log (default: OFF)</span>
+      </label>
       <div class="row" style="margin-top:10px;">
         <button id="startBtn" class="primary" disabled>Start Game</button>
         <button id="resetBtn">Reset</button>
@@ -550,6 +620,13 @@ Carol</textarea>
             </div>
             <div id="heapRatio" class="heap-ratio">live 0% / free 0%</div>
             <div id="heapTrend" class="heap-trend" aria-label="recent heap trend"></div>
+            <div id="heapDetail" class="heap-detail" hidden>
+              <div class="heap-detail-head">
+                <span>Detailed Metrics</span>
+                <span id="heapDetailHint" class="heap-detail-hint">latest GC.stat snapshot</span>
+              </div>
+              <div id="heapDetailGrid" class="heap-detail-grid"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -585,6 +662,15 @@ Carol</textarea>
 
         module GCGame
           class << self
+            def json_safe(value)
+              case value
+              when Numeric, String, TrueClass, FalseClass, NilClass
+                value
+              else
+                value.to_s
+              end
+            end
+
             def syntax_error(line)
               RubyVM::InstructionSequence.compile(line)
               nil
@@ -616,6 +702,7 @@ Carol</textarea>
               after_stat = GC.stat
               after = after_stat[:count]
               after_alloc = after_stat[:total_allocated_objects] || before_alloc
+              gc_info = GC.latest_gc_info || {}
               {
                 status: ok ? "ok" : "error",
                 value: ok ? value.inspect : nil,
@@ -625,6 +712,9 @@ Carol</textarea>
                 gc_happened: after > before,
                 gc_delta: after - before,
                 alloc_delta: [after_alloc - before_alloc, 0].max,
+                alloc_total_before: before_alloc,
+                alloc_total_after: after_alloc,
+                gc_info_after: gc_info.each_with_object({}) { |(k, v), h| h[k.to_s] = json_safe(v) },
                 gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
               }.to_json
             end
@@ -641,6 +731,7 @@ Carol</textarea>
         players: document.getElementById("players"),
         startBtn: document.getElementById("startBtn"),
         resetBtn: document.getElementById("resetBtn"),
+        detailMode: document.getElementById("detailMode"),
         turnName: document.getElementById("turnName"),
         turnCount: document.getElementById("turnCount"),
         lineInput: document.getElementById("lineInput"),
@@ -657,6 +748,9 @@ Carol</textarea>
         heapFreeBar: document.getElementById("heapFreeBar"),
         heapRatio: document.getElementById("heapRatio"),
         heapTrend: document.getElementById("heapTrend"),
+        heapDetail: document.getElementById("heapDetail"),
+        heapDetailHint: document.getElementById("heapDetailHint"),
+        heapDetailGrid: document.getElementById("heapDetailGrid"),
         outFx: document.getElementById("outFx"),
         outShards: document.getElementById("outShards"),
         outLabel: document.getElementById("outLabel"),
@@ -689,6 +783,7 @@ Carol</textarea>
         initialPlayers: 0,
         executedLines: [],
         heapHistory: [],
+        detailMode: false,
         gameOver: false,
         syntaxOK: false,
         checkTimer: null,
@@ -712,6 +807,39 @@ Carol</textarea>
       };
 
       const formatNumber = (n) => new Intl.NumberFormat("en-US").format(Number(n) || 0);
+      const formatBytes = (n) => {
+        const value = Number(n);
+        if (!Number.isFinite(value)) return "-";
+        const abs = Math.abs(value);
+        if (abs < 1024) return `${formatNumber(value)} B`;
+        if (abs < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+        if (abs < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+        return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
+      };
+
+      const HEAP_DETAIL_METRICS = [
+        { key: "heap_live_slots", label: "live slots" },
+        { key: "heap_free_slots", label: "free slots" },
+        { key: "total_allocated_objects", label: "allocated objs" },
+        { key: "total_freed_objects", label: "freed objs" },
+        { key: "minor_gc_count", label: "minor gc" },
+        { key: "major_gc_count", label: "major gc" },
+        { key: "malloc_increase_bytes", label: "malloc inc", bytes: true },
+        { key: "oldmalloc_increase_bytes", label: "oldmalloc inc", bytes: true }
+      ];
+
+      const formatGCInfo = (gcInfo) => {
+        if (!gcInfo || typeof gcInfo !== "object") return "n/a";
+        const keys = ["gc_by", "major_by", "have_finalizer", "immediate_sweep", "state"];
+        const parts = keys
+          .filter((k) => gcInfo[k] !== undefined && gcInfo[k] !== null)
+          .map((k) => `${k}=${String(gcInfo[k])}`);
+        if (parts.length > 0) return parts.join(", ");
+        const fallback = Object.entries(gcInfo)
+          .slice(0, 5)
+          .map(([k, v]) => `${k}=${String(v)}`);
+        return fallback.length > 0 ? fallback.join(", ") : "n/a";
+      };
 
       const renderHeapTrend = () => {
         el.heapTrend.textContent = "";
@@ -735,12 +863,54 @@ Carol</textarea>
         }
       };
 
-      const updateGCWindow = (gcStat) => {
+      const renderHeapDetail = (gcStat, gcInfo) => {
+        if (!state.detailMode || !gcStat) {
+          el.heapDetail.hidden = true;
+          el.heapDetailGrid.textContent = "";
+          el.heapDetailHint.textContent = "latest GC.stat snapshot";
+          return;
+        }
+        const hintParts = [];
+        if (gcInfo && typeof gcInfo === "object") {
+          if (gcInfo.gc_by !== undefined && gcInfo.gc_by !== null) {
+            hintParts.push(`gc_by=${String(gcInfo.gc_by)}`);
+          }
+          if (gcInfo.major_by !== undefined && gcInfo.major_by !== null) {
+            hintParts.push(`major_by=${String(gcInfo.major_by)}`);
+          }
+        }
+        el.heapDetailHint.textContent = hintParts.length > 0 ? hintParts.join(" / ") : "latest GC.stat snapshot";
+        el.heapDetailGrid.textContent = "";
+        for (const metric of HEAP_DETAIL_METRICS) {
+          const raw = gcStat[metric.key];
+          const value = Number(raw);
+          const card = document.createElement("div");
+          card.className = "heap-detail-card";
+
+          const label = document.createElement("span");
+          label.className = "label";
+          label.textContent = metric.label;
+
+          const val = document.createElement("span");
+          val.className = "value";
+          val.textContent = Number.isFinite(value)
+            ? (metric.bytes ? formatBytes(value) : formatNumber(value))
+            : "-";
+
+          card.appendChild(label);
+          card.appendChild(val);
+          el.heapDetailGrid.appendChild(card);
+        }
+        el.heapDetail.hidden = false;
+      };
+
+      const updateGCWindow = (gcStat, gcInfo = null) => {
         if (!gcStat) {
           state.heapHistory = [];
           el.heapEmpty.hidden = false;
           el.heapViz.hidden = true;
           el.heapTrend.textContent = "";
+          renderHeapDetail(null, null);
           return;
         }
         const live = Math.max(0, Number(gcStat.heap_live_slots || 0));
@@ -766,6 +936,7 @@ Carol</textarea>
         el.heapFreeBar.style.width = `${freePct.toFixed(2)}%`;
         el.heapRatio.textContent = `live ${livePctInt}% / free ${freePctInt}%`;
         renderHeapTrend();
+        renderHeapDetail(gcStat, gcInfo);
       };
 
       const setSyntax = (text, ok) => {
@@ -1062,8 +1233,19 @@ const handleCommand = (data) => {
     }
     if (cmd === "run_line") {
       const code = String((payload && payload.code) || "");
+      const allocBeforeRaw = vm.eval("GC.stat[:total_allocated_objects]");
+      const allocBefore = Number(rubyResultToString(allocBeforeRaw));
       const raw = vm.eval("GCGame.run_line(" + JSON.stringify(code) + ")");
+      const allocAfterRaw = vm.eval("GC.stat[:total_allocated_objects]");
+      const allocAfter = Number(rubyResultToString(allocAfterRaw));
       const result = JSON.parse(rubyResultToString(raw));
+      if (Number.isFinite(allocBefore) && Number.isFinite(allocAfter)) {
+        const beforeSafe = Math.max(0, Math.trunc(allocBefore));
+        const afterSafe = Math.max(beforeSafe, Math.trunc(allocAfter));
+        result.alloc_total_before = beforeSafe;
+        result.alloc_total_after = afterSafe;
+        result.alloc_delta = afterSafe - beforeSafe;
+      }
       self.postMessage({ id, ok: true, result });
       return;
     }
@@ -1338,12 +1520,20 @@ self.onmessage = (event) => {
           }
           const allocDelta = Math.max(0, Number(result.alloc_delta || 0));
           appendLog(`📦 [alloc] +${formatNumber(allocDelta)} objects`);
-          updateGCWindow(result.gc_stat_after);
+          if (state.detailMode) {
+            appendLog(
+              `🔎 [detail] gc_count ${result.gc_before} -> ${result.gc_after}, alloc_total ${formatNumber(result.alloc_total_before)} -> ${formatNumber(result.alloc_total_after)}`
+            );
+          }
+          updateGCWindow(result.gc_stat_after, result.gc_info_after);
           const gcDelta = Number(result.gc_delta || 0);
           if (gcDelta > 0) {
             eliminatePlayer(currentIdx, "GC");
             showOutFx();
             appendLog(`💥 [FAIL] ${player} triggered GC (+${gcDelta}) and is OUT`);
+            if (state.detailMode) {
+              appendLog(`🔎 [detail] gc_info ${formatGCInfo(result.gc_info_after)}`);
+            }
             updateProgressView();
             renderScoreBoard();
             await waitOutFx();
@@ -1473,6 +1663,7 @@ self.onmessage = (event) => {
         state.roundQueue = [];
         state.initialPlayers = names.length;
         state.executedLines = [];
+        state.detailMode = Boolean(el.detailMode.checked);
         state.gameOver = false;
         state.syntaxOK = false;
         state.runInFlight = false;
@@ -1480,14 +1671,15 @@ self.onmessage = (event) => {
         clearFinishFx();
         el.log.textContent = "";
         appendLog(`[system] Game started: ${names.join(", ")} (n=${target}, failures to end)`);
+        appendLog(`[system] Detailed GC log: ${state.detailMode ? "ON" : "OFF"}`);
         if (names.length === 1) {
           appendLog("[system] Solo mode: one safe turn ends the game.");
         }
         try {
           const initialStat = await sendWorkerCommand("gc_stat", {}, 1500);
-          updateGCWindow(initialStat);
+          updateGCWindow(initialStat, null);
         } catch (e) {
-          updateGCWindow(null);
+          updateGCWindow(null, null);
           appendLog(`[system] heap stats init failed: ${String(e)}`);
         }
         ensureCurrentTurn();
@@ -1526,7 +1718,7 @@ self.onmessage = (event) => {
         el.lineInput.disabled = true;
         el.runBtn.disabled = true;
         setSyntax("No input", null);
-        updateGCWindow(null);
+        updateGCWindow(null, null);
         appendLog("[system] Game reset.");
       };
 
