@@ -444,6 +444,7 @@ Carol</textarea>
       const state = {
         worker: null,
         workerReady: false,
+        rubyInfo: null,
         requestSeq: 0,
         pendingRequests: new Map(),
         players: [],
@@ -458,6 +459,14 @@ Carol</textarea>
         syntaxSeq: 0,
         runInFlight: false,
         finishFxTimer: null
+      };
+
+      const formatRubyInfo = (info = state.rubyInfo) => {
+        if (!info || !info.version) return "Ruby VM ready";
+        const engine = info.engine || "ruby";
+        const patch = Number.isInteger(info.patchlevel) && info.patchlevel >= 0 ? `p${info.patchlevel}` : "";
+        const platform = info.platform ? ` / ${info.platform}` : "";
+        return `Ruby VM ready (${engine} ${info.version}${patch}${platform})`;
       };
 
       const appendLog = (line) => {
@@ -595,6 +604,7 @@ Carol</textarea>
           state.worker = null;
         }
         state.workerReady = false;
+        state.rubyInfo = null;
         rejectPendingRequests(message || "Ruby worker terminated");
       };
 
@@ -677,7 +687,11 @@ self.onmessage = (event) => {
     const runtime = await pkg.DefaultRubyVM(mod);
     vm = runtime.vm;
     vm.eval(RUBY_BOOT_CODE);
-    self.postMessage({ type: "ready" });
+    const rawInfo = vm.eval(
+      "{ engine: (defined?(RUBY_ENGINE) ? RUBY_ENGINE : 'ruby'), version: RUBY_VERSION, patchlevel: RUBY_PATCHLEVEL, platform: RUBY_PLATFORM, release_date: RUBY_RELEASE_DATE }.to_json"
+    );
+    const info = JSON.parse(rubyResultToString(rawInfo));
+    self.postMessage({ type: "ready", info });
   } catch (e) {
     self.postMessage({ type: "boot_error", error: String(e) });
   }
@@ -704,6 +718,7 @@ self.onmessage = (event) => {
             const data = event.data || {};
             if (data.type === "ready") {
               state.workerReady = true;
+              state.rubyInfo = data.info || null;
               if (!settled) {
                 settled = true;
                 resolve();
@@ -881,8 +896,9 @@ self.onmessage = (event) => {
           el.bootState.textContent = "Booting Ruby VM...";
           try {
             await initRubyWorker();
-            el.bootState.textContent = "Ruby VM ready";
-            appendLog("[system] Ruby VM ready");
+            const readyText = formatRubyInfo();
+            el.bootState.textContent = readyText;
+            appendLog(`[system] ${readyText}`);
           } catch (e) {
             el.bootState.textContent = "Ruby VM boot failed";
             appendLog(`[system] boot failed: ${String(e)}`);
@@ -963,9 +979,9 @@ self.onmessage = (event) => {
       (async () => {
         try {
           await initRubyWorker();
-          el.bootState.textContent = "Ruby VM ready";
+          el.bootState.textContent = formatRubyInfo();
           el.startBtn.disabled = false;
-          appendLog("[system] Ruby VM ready");
+          appendLog(`[system] ${formatRubyInfo()}`);
         } catch (e) {
           el.bootState.textContent = "Ruby VM boot failed";
           appendLog(`[system] boot failed: ${String(e)}`);
