@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GC Surface Tension Game</title>
+  <style>
+    :root {
+      --bg: #f8f7f4;
+      --panel: #ffffff;
+      --ink: #1f1f1f;
+      --sub: #666;
+      --line: #ddd;
+      --ok: #1f7a3f;
+      --ng: #a12828;
+      --accent: #0e5a8a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1400px 600px at 90% -20%, #dceef9, transparent),
+        radial-gradient(1000px 500px at -10% 120%, #fbe8cf, transparent),
+        var(--bg);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--sub);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    textarea, input, button {
+      font: inherit;
+    }
+
+    textarea, input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    button {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-weight: 700;
+    }
+
+    .ok { color: var(--ok); }
+    .ng { color: var(--ng); }
+
+    .log {
+      background: #141414;
+      color: #f2f2f2;
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 280px;
+      max-height: 420px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+
+    .game-area {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      align-items: start;
+    }
+
+    .gc-window {
+      background: #111722;
+      color: #eaf0fb;
+      border-radius: 10px;
+      border: 1px solid #2a3a52;
+      padding: 10px;
+      min-height: 280px;
+      max-height: 420px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      line-height: 1.35;
+      font-size: 12px;
+    }
+
+    @media (max-width: 860px) {
+      .game-area {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .meta {
+      font-size: 14px;
+      color: var(--sub);
+    }
+
+    .score-board {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfbfb;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      line-height: 1.35;
+      min-height: 92px;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>GC版 表面張力ゲーム</h1>
+      <p>n回目のGCが起きるまでオブジェクト生成数を競います。最後にGCを起こした人は0点です。</p>
+    </section>
+
+    <section class="panel">
+      <div class="row" style="margin-bottom:8px;">
+        <strong>準備</strong>
+        <span id="bootState" class="meta">Ruby VM 起動中...</span>
+      </div>
+      <label for="players">プレイヤー名（1行1人、2人以上）</label>
+      <textarea id="players">Alice
+Bob
+Carol</textarea>
+      <div style="margin-top:10px;max-width:220px;">
+        <label for="gcTarget">GC目標回数 n（1以上）</label>
+        <input id="gcTarget" type="number" min="1" step="1" value="1">
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="startBtn" class="primary" disabled>ゲーム開始</button>
+        <button id="resetBtn">リセット</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div class="meta">現在の手番</div>
+          <div id="turnName" style="font-size:20px;font-weight:700;">-</div>
+        </div>
+        <div>
+          <div class="meta">手数</div>
+          <div id="turnCount" style="font-size:20px;font-weight:700;">0</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label for="lineInput">Ruby 1行入力</label>
+        <input id="lineInput" placeholder="例: a = 'x' * 1000" autocomplete="off" disabled>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <span class="meta">構文チェック:</span>
+        <span id="syntaxState" class="status">未入力</span>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="runBtn" class="primary" disabled>この行で確定</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <span class="meta">GC進行:</span>
+        <strong id="gcProgress">0 / -</strong>
+      </div>
+      <div class="meta" style="margin-top:8px;">スコア（生成オブジェクト数）</div>
+      <pre id="scoreBoard" class="score-board">ゲーム開始で表示されます。</pre>
+    </section>
+
+    <div class="game-area">
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <strong>ゲームログ</strong>
+          <span class="meta">n回目GCで終了 / 最後にGCを起こした人は0点</span>
+        </div>
+        <pre id="log" class="log"></pre>
+      </section>
+
+      <section class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <strong>GC.stat</strong>
+          <span class="meta">直近ターン終了時</span>
+        </div>
+        <pre id="gcStat" class="gc-window">まだ実行されていません。</pre>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.umd.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const el = {
+        bootState: document.getElementById("bootState"),
+        players: document.getElementById("players"),
+        gcTarget: document.getElementById("gcTarget"),
+        startBtn: document.getElementById("startBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        turnName: document.getElementById("turnName"),
+        turnCount: document.getElementById("turnCount"),
+        lineInput: document.getElementById("lineInput"),
+        syntaxState: document.getElementById("syntaxState"),
+        gcProgress: document.getElementById("gcProgress"),
+        scoreBoard: document.getElementById("scoreBoard"),
+        runBtn: document.getElementById("runBtn"),
+        log: document.getElementById("log"),
+        gcStat: document.getElementById("gcStat")
+      };
+
+      const state = {
+        vm: null,
+        players: [],
+        current: 0,
+        turn: 0,
+        gcTarget: 1,
+        gcProgress: 0,
+        scores: {},
+        gameOver: false,
+        syntaxOK: false,
+        checkTimer: null
+      };
+
+      const appendLog = (line) => {
+        el.log.textContent += line + "\n";
+        el.log.scrollTop = el.log.scrollHeight;
+      };
+
+      const updateGCWindow = (gcStat) => {
+        if (!gcStat) {
+          el.gcStat.textContent = "まだ実行されていません。";
+          return;
+        }
+        el.gcStat.textContent = JSON.stringify(gcStat, null, 2);
+      };
+
+      const rubyResultToString = (value) => {
+        if (typeof value === "string") return value;
+        if (value == null) return "";
+        try {
+          if (typeof value.toJS === "function") {
+            const jsValue = value.toJS();
+            if (jsValue == null) return "";
+            if (typeof jsValue === "string") return jsValue;
+            return String(jsValue);
+          }
+        } catch (_) {}
+        try {
+          if (typeof value.toString === "function") {
+            return value.toString();
+          }
+        } catch (_) {}
+        return String(value);
+      };
+
+      const setSyntax = (text, ok) => {
+        el.syntaxState.textContent = text;
+        el.syntaxState.classList.remove("ok", "ng");
+        if (ok === true) el.syntaxState.classList.add("ok");
+        if (ok === false) el.syntaxState.classList.add("ng");
+      };
+
+      const updateTurnView = () => {
+        el.turnName.textContent = state.players[state.current] || "-";
+        el.turnCount.textContent = String(state.turn);
+      };
+
+      const updateProgressView = () => {
+        const target = state.gcTarget > 0 ? state.gcTarget : "-";
+        el.gcProgress.textContent = `${state.gcProgress} / ${target}`;
+      };
+
+      const renderScoreBoard = () => {
+        if (state.players.length === 0) {
+          el.scoreBoard.textContent = "ゲーム開始で表示されます。";
+          return;
+        }
+        const lines = state.players.map((name, idx) => {
+          const pointer = (!state.gameOver && idx === state.current) ? ">" : " ";
+          return `${pointer} ${name}: ${state.scores[name] ?? 0}`;
+        });
+        el.scoreBoard.textContent = lines.join("\n");
+      };
+
+      const parsePlayers = () => {
+        return el.players.value
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      };
+
+      const checkSyntax = async (code) => {
+        const raw = state.vm.eval(
+          `GCGame.syntax_check(${JSON.stringify(code)})`
+        );
+        const result = JSON.parse(rubyResultToString(raw));
+        if (result.ok) {
+          state.syntaxOK = true;
+          setSyntax("OK", true);
+        } else {
+          state.syntaxOK = false;
+          setSyntax("NG: " + (result.error || "SyntaxError"), false);
+        }
+        el.runBtn.disabled = !state.syntaxOK || state.gameOver;
+      };
+
+      const onLineInput = () => {
+        const code = el.lineInput.value;
+        state.syntaxOK = false;
+        el.runBtn.disabled = true;
+
+        if (!code.trim()) {
+          setSyntax("未入力", null);
+          return;
+        }
+
+        setSyntax("チェック中...", null);
+        clearTimeout(state.checkTimer);
+        state.checkTimer = setTimeout(() => {
+          checkSyntax(code).catch((e) => {
+            state.syntaxOK = false;
+            setSyntax("NG: チェック失敗", false);
+            appendLog(`[system] syntax check failed: ${String(e)}`);
+          });
+        }, 120);
+      };
+
+      const runTurn = async () => {
+        if (state.gameOver || !state.syntaxOK) return;
+        const code = el.lineInput.value;
+        const player = state.players[state.current];
+        state.turn += 1;
+        updateTurnView();
+
+        const raw = state.vm.eval(
+          `GCGame.run_line(${JSON.stringify(code)})`
+        );
+        const result = JSON.parse(rubyResultToString(raw));
+
+        appendLog(`[turn ${state.turn}] ${player}> ${code}`);
+        if (result.status === "ok") {
+          appendLog(`=> ${result.value}`);
+        } else {
+          appendLog(`!! ${result.error}`);
+        }
+        state.scores[player] = (state.scores[player] || 0) + (result.alloc_delta || 0);
+        state.gcProgress += (result.gc_delta || 0);
+        appendLog(`[score] +${result.alloc_delta} objects, GC +${result.gc_delta}`);
+        updateGCWindow(result.gc_stat_after);
+        updateProgressView();
+        renderScoreBoard();
+
+        if (state.gcProgress >= state.gcTarget) {
+          state.gameOver = true;
+          state.scores[player] = 0;
+          renderScoreBoard();
+          appendLog(
+            `[LOSE] ${player} が最後のGCを起こしたためスコア0 (${result.gc_before} -> ${result.gc_after})`
+          );
+          const entries = state.players.map((name) => ({
+            name,
+            score: state.scores[name] || 0
+          }));
+          const maxScore = Math.max(...entries.map((e) => e.score));
+          const winners = entries.filter((e) => e.score === maxScore).map((e) => e.name);
+          appendLog(`[result] ${entries.map((e) => `${e.name}=${e.score}`).join(", ")}`);
+          if (winners.length === 1) {
+            appendLog(`[WIN] ${winners[0]} (${maxScore})`);
+          } else {
+            appendLog(`[DRAW] ${winners.join(", ")} (${maxScore})`);
+          }
+          setSyntax("ゲーム終了", false);
+          el.runBtn.disabled = true;
+          el.lineInput.disabled = true;
+          return;
+        }
+
+        appendLog(`[progress] GC count: ${result.gc_before} -> ${result.gc_after} (total +${state.gcProgress})`);
+
+        state.current = (state.current + 1) % state.players.length;
+        updateTurnView();
+        renderScoreBoard();
+        el.lineInput.value = "";
+        state.syntaxOK = false;
+        el.runBtn.disabled = true;
+        setSyntax("未入力", null);
+        el.lineInput.focus();
+      };
+
+      const startGame = () => {
+        const names = parsePlayers();
+        const targetRaw = Number.parseInt(el.gcTarget.value, 10);
+        const target = Number.isFinite(targetRaw) && targetRaw > 0 ? targetRaw : 1;
+        el.gcTarget.value = String(target);
+        if (names.length < 2) {
+          appendLog("[system] プレイヤーは2人以上必要です。");
+          return;
+        }
+        state.players = names;
+        state.current = 0;
+        state.turn = 0;
+        state.gcTarget = target;
+        state.gcProgress = 0;
+        state.scores = Object.fromEntries(names.map((name) => [name, 0]));
+        state.gameOver = false;
+        state.syntaxOK = false;
+        el.log.textContent = "";
+        updateGCWindow(null);
+        updateTurnView();
+        updateProgressView();
+        renderScoreBoard();
+        setSyntax("未入力", null);
+        el.lineInput.value = "";
+        el.lineInput.disabled = false;
+        el.runBtn.disabled = true;
+        appendLog(`[system] game start: ${names.join(", ")} / target GC: ${target}`);
+        el.lineInput.focus();
+      };
+
+      const resetGame = () => {
+        state.players = [];
+        state.current = 0;
+        state.turn = 0;
+        state.gcProgress = 0;
+        state.scores = {};
+        state.gameOver = false;
+        state.syntaxOK = false;
+        updateTurnView();
+        updateProgressView();
+        renderScoreBoard();
+        el.lineInput.value = "";
+        el.lineInput.disabled = true;
+        el.runBtn.disabled = true;
+        setSyntax("未入力", null);
+        updateGCWindow(null);
+        appendLog("[system] reset");
+      };
+
+      const initRuby = async () => {
+        const pkg = window["ruby-wasm-wasi"];
+        if (!pkg || !pkg.DefaultRubyVM) {
+          throw new Error("ruby-wasm-wasi is not available");
+        }
+        const wasmUrl = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/ruby+stdlib.wasm";
+        const response = await fetch(wasmUrl);
+        const bytes = await response.arrayBuffer();
+        const mod = await WebAssembly.compile(bytes);
+        const { vm } = await pkg.DefaultRubyVM(mod);
+        state.vm = vm;
+        vm.eval(`
+          require "json"
+
+          module GCGame
+            class << self
+              def syntax_error(line)
+                RubyVM::InstructionSequence.compile(line)
+                nil
+              rescue SyntaxError => e
+                first = e.message.to_s.lines.first
+                (first || e.message).to_s.strip
+              end
+
+              def syntax_check(line)
+                err = syntax_error(line)
+                { ok: err.nil?, error: err }.to_json
+              end
+
+              def run_line(line)
+                before_stat = GC.stat
+                before = before_stat[:count]
+                before_alloc = before_stat[:total_allocated_objects]
+                value = nil
+                error = nil
+                ok = true
+
+                begin
+                  value = TOPLEVEL_BINDING.eval(line, "(gc-game)", 1)
+                rescue Exception => e
+                  ok = false
+                  error = "#{e.class}: #{e.message}"
+                end
+
+                after_stat = GC.stat
+                after = after_stat[:count]
+                after_alloc = after_stat[:total_allocated_objects]
+                {
+                  status: ok ? "ok" : "error",
+                  value: ok ? value.inspect : nil,
+                  error: error,
+                  gc_before: before,
+                  gc_after: after,
+                  gc_happened: after > before,
+                  gc_delta: after - before,
+                  alloc_delta: after_alloc - before_alloc,
+                  gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
+                }.to_json
+              end
+            end
+          end
+        `);
+      };
+
+      el.startBtn.addEventListener("click", startGame);
+      el.resetBtn.addEventListener("click", resetGame);
+      el.lineInput.addEventListener("input", onLineInput);
+      el.runBtn.addEventListener("click", () => {
+        runTurn().catch((e) => appendLog(`[system] run failed: ${String(e)}`));
+      });
+      el.lineInput.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (!el.runBtn.disabled) {
+          runTurn().catch((err) => appendLog(`[system] run failed: ${String(err)}`));
+        }
+      });
+
+      (async () => {
+        try {
+          await initRuby();
+          el.bootState.textContent = "Ruby VM 起動完了";
+          el.startBtn.disabled = false;
+          appendLog("[system] Ruby VM ready");
+        } catch (e) {
+          el.bootState.textContent = "Ruby VM 起動失敗";
+          appendLog(`[system] boot failed: ${String(e)}`);
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>
