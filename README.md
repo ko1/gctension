@@ -1,33 +1,34 @@
 # GC Surface Tension Game
 
-`ruby.wasm` を使った、ローカル交代プレイ用のブラウザゲームです。  
-1行ずつ Ruby を実行し、GC とオブジェクト生成数で勝敗を決めます。
+A local pass-and-play browser game powered by `ruby.wasm`.  
+Players submit one Ruby line per turn, and the winner is decided by allocation-based scoring with GC-driven end conditions.
 
 ## Files
 
-- `index.html`: アプリ本体（UI + ロジック）
-- `spec.md`: 仕様書（English）
+- `index.html`: Main app (UI + game logic)
+- `spec.md`: Detailed specification (English)
 
 ## Quick Start
 
-1. このディレクトリで簡易サーバを起動
-2. ブラウザで `index.html` を開く
-3. プレイヤー名と GC目標回数 `n` を設定して開始
+1. Start a simple local web server in this directory.
+2. Open the app in your browser.
+3. Set player names and GC target count `n`, then start the game.
 
-例:
+Example:
 
 ```bash
 cd /home/ko1/app/gctension
 python3 -m http.server 8000
 ```
 
-ブラウザで `http://localhost:8000` を開いてください。
+Open `http://localhost:8000` in your browser.
 
 ## Rules (Short)
 
-1. プレイヤーは1人1行ずつ Ruby を入力
-2. 構文エラーの行は確定できない
-3. 各ターンで `alloc_delta`（生成オブジェクト増分）をその人のスコアに加算
-4. GC進行の合計が `n` に達したら終了
-5. 最後のGCを起こした人はスコア `0`
-6. 最高スコアの人が勝ち（同点は引き分け）
+1. Players take turns entering exactly one line of Ruby.
+2. Lines with syntax errors cannot be submitted.
+3. On each turn, `alloc_delta` is added to the current player's score.
+4. The game ends when total GC progress reaches target `n`.
+5. The player who triggers the final GC gets score `0`.
+6. If a turn takes more than 3 seconds, that player gets score `0`.
+7. The highest score wins (ties are a draw).

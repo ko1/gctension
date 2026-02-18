@@ -160,69 +160,183 @@
       line-height: 1.35;
       min-height: 92px;
     }
+
+    .finish-fx {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(1.02);
+      transition: opacity 220ms ease, transform 220ms ease;
+      background:
+        radial-gradient(900px 500px at 50% 10%, rgba(255, 236, 168, 0.32), transparent 60%),
+        radial-gradient(900px 500px at 20% 100%, rgba(143, 218, 255, 0.22), transparent 60%),
+        rgba(8, 14, 24, 0.66);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .finish-fx.active {
+      opacity: 1;
+      transform: scale(1);
+      animation: finishPulse 700ms ease-out, failFlash 320ms ease-out;
+    }
+
+    .finish-card {
+      width: min(760px, 100%);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background:
+        linear-gradient(130deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.09));
+      backdrop-filter: blur(6px);
+      color: #f5f8ff;
+      padding: 20px 22px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+      animation: failShake 260ms ease-in-out 2;
+    }
+
+    .finish-kicker {
+      margin: 0;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.92;
+    }
+
+    .finish-title {
+      margin: 8px 0 6px;
+      font-size: clamp(28px, 6vw, 52px);
+      line-height: 1;
+      text-wrap: balance;
+    }
+
+    .finish-sub {
+      margin: 0;
+      font-size: 16px;
+      opacity: 0.95;
+      text-wrap: balance;
+    }
+
+    .finish-detail {
+      margin: 10px 0 0;
+      font-size: 13px;
+      opacity: 0.8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .finish-confetti {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .finish-piece {
+      position: absolute;
+      width: 9px;
+      height: 14px;
+      border-radius: 1px;
+      opacity: 0.88;
+      top: -24px;
+      clip-path: polygon(50% 0%, 100% 38%, 72% 100%, 0% 78%);
+      animation: crashFall linear forwards, spinOut ease-in-out infinite alternate;
+      box-shadow: 0 0 10px rgba(255, 60, 60, 0.2);
+    }
+
+    @keyframes crashFall {
+      from { transform: translateY(-6vh) rotate(0deg); }
+      to { transform: translateY(120vh) rotate(980deg); }
+    }
+
+    @keyframes spinOut {
+      from { margin-left: -9px; }
+      to { margin-left: 9px; }
+    }
+
+    @keyframes finishPulse {
+      0% { transform: scale(1.04); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes failShake {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(-10px); }
+      40% { transform: translateX(9px); }
+      60% { transform: translateX(-7px); }
+      80% { transform: translateX(6px); }
+      100% { transform: translateX(0); }
+    }
+
+    @keyframes failFlash {
+      0% { background-color: rgba(255, 70, 70, 0.25); }
+      100% { background-color: transparent; }
+    }
   </style>
 </head>
 <body>
   <main class="wrap">
     <section class="panel">
-      <h1>GC版 表面張力ゲーム</h1>
-      <p>n回目のGCが起きるまでオブジェクト生成数を競います。最後にGCを起こした人は0点です。</p>
+      <h1>GC Surface Tension Game</h1>
+      <p>Compete on object allocations until the n-th GC occurs. Exceed 3 seconds on a turn and your score becomes 0.</p>
     </section>
 
     <section class="panel">
       <div class="row" style="margin-bottom:8px;">
-        <strong>準備</strong>
-        <span id="bootState" class="meta">Ruby VM 起動中...</span>
+        <strong>Setup</strong>
+        <span id="bootState" class="meta">Booting Ruby VM...</span>
       </div>
-      <label for="players">プレイヤー名（1行1人、2人以上）</label>
+      <label for="players">Player names (one per line, minimum 2)</label>
       <textarea id="players">Alice
 Bob
 Carol</textarea>
       <div style="margin-top:10px;max-width:220px;">
-        <label for="gcTarget">GC目標回数 n（1以上）</label>
+        <label for="gcTarget">GC target count n (>= 1)</label>
         <input id="gcTarget" type="number" min="1" step="1" value="1">
       </div>
       <div class="row" style="margin-top:10px;">
-        <button id="startBtn" class="primary" disabled>ゲーム開始</button>
-        <button id="resetBtn">リセット</button>
+        <button id="startBtn" class="primary" disabled>Start Game</button>
+        <button id="resetBtn">Reset</button>
       </div>
     </section>
 
     <section class="panel">
       <div class="row" style="justify-content:space-between;">
         <div>
-          <div class="meta">現在の手番</div>
+          <div class="meta">Current Turn</div>
           <div id="turnName" style="font-size:20px;font-weight:700;">-</div>
         </div>
         <div>
-          <div class="meta">手数</div>
+          <div class="meta">Turn Count</div>
           <div id="turnCount" style="font-size:20px;font-weight:700;">0</div>
         </div>
       </div>
       <div style="margin-top:12px;">
-        <label for="lineInput">Ruby 1行入力</label>
-        <input id="lineInput" placeholder="例: a = 'x' * 1000" autocomplete="off" disabled>
+        <label for="lineInput">One Ruby line</label>
+        <input id="lineInput" placeholder="e.g. a = 'x' * 1000" autocomplete="off" disabled>
       </div>
       <div class="row" style="margin-top:10px;">
-        <span class="meta">構文チェック:</span>
-        <span id="syntaxState" class="status">未入力</span>
+        <span class="meta">Syntax check:</span>
+        <span id="syntaxState" class="status">No input</span>
       </div>
       <div class="row" style="margin-top:10px;">
-        <button id="runBtn" class="primary" disabled>この行で確定</button>
+        <button id="runBtn" class="primary" disabled>Submit This Line</button>
       </div>
       <div class="row" style="margin-top:10px;">
-        <span class="meta">GC進行:</span>
+        <span class="meta">GC progress:</span>
         <strong id="gcProgress">0 / -</strong>
       </div>
-      <div class="meta" style="margin-top:8px;">スコア（生成オブジェクト数）</div>
-      <pre id="scoreBoard" class="score-board">ゲーム開始で表示されます。</pre>
+      <div class="meta" style="margin-top:8px;">Scores (allocated objects)</div>
+      <pre id="scoreBoard" class="score-board">Appears after game start.</pre>
     </section>
 
     <div class="game-area">
       <section class="panel">
         <div class="row" style="justify-content:space-between;">
-          <strong>ゲームログ</strong>
-          <span class="meta">n回目GCで終了 / 最後にGCを起こした人は0点</span>
+          <strong>Game Log</strong>
+          <span class="meta">Ends on n-th GC / final GC or 3s timeout -> score 0</span>
         </div>
         <pre id="log" class="log"></pre>
       </section>
@@ -230,17 +344,80 @@ Carol</textarea>
       <section class="panel">
         <div class="row" style="justify-content:space-between;">
           <strong>GC.stat</strong>
-          <span class="meta">直近ターン終了時</span>
+          <span class="meta">After latest turn</span>
         </div>
-        <pre id="gcStat" class="gc-window">まだ実行されていません。</pre>
+        <pre id="gcStat" class="gc-window">No turns executed yet.</pre>
       </section>
     </div>
   </main>
+  <div id="finishFx" class="finish-fx" aria-hidden="true">
+    <div id="finishConfetti" class="finish-confetti"></div>
+    <section class="finish-card">
+      <p class="finish-kicker">Critical Failure</p>
+      <h2 id="finishTitle" class="finish-title">FAILED!</h2>
+      <p id="finishSub" class="finish-sub"></p>
+      <p id="finishDetail" class="finish-detail"></p>
+    </section>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.umd.js"></script>
   <script>
     (() => {
       "use strict";
+
+      const RUBY_PACKAGE_URL = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.umd.js";
+      const RUBY_WASM_URL = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/ruby+stdlib.wasm";
+      const EXEC_TIMEOUT_MS = 3000;
+      const RUBY_BOOT_CODE = `
+        require "json"
+
+        module GCGame
+          class << self
+            def syntax_error(line)
+              RubyVM::InstructionSequence.compile(line)
+              nil
+            rescue SyntaxError => e
+              first = e.message.to_s.lines.first
+              (first || e.message).to_s.strip
+            end
+
+            def syntax_check(line)
+              err = syntax_error(line)
+              { ok: err.nil?, error: err }.to_json
+            end
+
+            def run_line(line)
+              before_stat = GC.stat
+              before = before_stat[:count]
+              before_alloc = before_stat[:total_allocated_objects]
+              value = nil
+              error = nil
+              ok = true
+
+              begin
+                value = TOPLEVEL_BINDING.eval(line, "(gc-game)", 1)
+              rescue Exception => e
+                ok = false
+                error = "#{e.class}: #{e.message}"
+              end
+
+              after_stat = GC.stat
+              after = after_stat[:count]
+              after_alloc = after_stat[:total_allocated_objects]
+              {
+                status: ok ? "ok" : "error",
+                value: ok ? value.inspect : nil,
+                error: error,
+                gc_before: before,
+                gc_after: after,
+                gc_happened: after > before,
+                gc_delta: after - before,
+                alloc_delta: after_alloc - before_alloc,
+                gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
+              }.to_json
+            end
+          end
+        end
+      `;
 
       const el = {
         bootState: document.getElementById("bootState"),
@@ -256,11 +433,19 @@ Carol</textarea>
         scoreBoard: document.getElementById("scoreBoard"),
         runBtn: document.getElementById("runBtn"),
         log: document.getElementById("log"),
-        gcStat: document.getElementById("gcStat")
+        gcStat: document.getElementById("gcStat"),
+        finishFx: document.getElementById("finishFx"),
+        finishConfetti: document.getElementById("finishConfetti"),
+        finishTitle: document.getElementById("finishTitle"),
+        finishSub: document.getElementById("finishSub"),
+        finishDetail: document.getElementById("finishDetail")
       };
 
       const state = {
-        vm: null,
+        worker: null,
+        workerReady: false,
+        requestSeq: 0,
+        pendingRequests: new Map(),
         players: [],
         current: 0,
         turn: 0,
@@ -269,7 +454,10 @@ Carol</textarea>
         scores: {},
         gameOver: false,
         syntaxOK: false,
-        checkTimer: null
+        checkTimer: null,
+        syntaxSeq: 0,
+        runInFlight: false,
+        finishFxTimer: null
       };
 
       const appendLog = (line) => {
@@ -279,29 +467,10 @@ Carol</textarea>
 
       const updateGCWindow = (gcStat) => {
         if (!gcStat) {
-          el.gcStat.textContent = "まだ実行されていません。";
+          el.gcStat.textContent = "No turns executed yet.";
           return;
         }
         el.gcStat.textContent = JSON.stringify(gcStat, null, 2);
-      };
-
-      const rubyResultToString = (value) => {
-        if (typeof value === "string") return value;
-        if (value == null) return "";
-        try {
-          if (typeof value.toJS === "function") {
-            const jsValue = value.toJS();
-            if (jsValue == null) return "";
-            if (typeof jsValue === "string") return jsValue;
-            return String(jsValue);
-          }
-        } catch (_) {}
-        try {
-          if (typeof value.toString === "function") {
-            return value.toString();
-          }
-        } catch (_) {}
-        return String(value);
       };
 
       const setSyntax = (text, ok) => {
@@ -323,7 +492,7 @@ Carol</textarea>
 
       const renderScoreBoard = () => {
         if (state.players.length === 0) {
-          el.scoreBoard.textContent = "ゲーム開始で表示されます。";
+          el.scoreBoard.textContent = "Appears after game start.";
           return;
         }
         const lines = state.players.map((name, idx) => {
@@ -340,19 +509,276 @@ Carol</textarea>
           .filter(Boolean);
       };
 
-      const checkSyntax = async (code) => {
-        const raw = state.vm.eval(
-          `GCGame.syntax_check(${JSON.stringify(code)})`
-        );
-        const result = JSON.parse(rubyResultToString(raw));
+      const clearFinishFx = () => {
+        if (state.finishFxTimer) {
+          clearTimeout(state.finishFxTimer);
+          state.finishFxTimer = null;
+        }
+        el.finishFx.classList.remove("active");
+        el.finishFx.setAttribute("aria-hidden", "true");
+        el.finishConfetti.textContent = "";
+        el.finishTitle.textContent = "FAILED!";
+        el.finishSub.textContent = "";
+        el.finishDetail.textContent = "";
+      };
+
+      const showFinishFx = (summary, reasonText, failedPlayer) => {
+        clearFinishFx();
+        const { winners, maxScore, entries } = summary;
+        const winnerText = winners.length > 1 ? `Top score tie: ${winners.join(" / ")}` : `Top score: ${winners[0]}`;
+        el.finishTitle.textContent = `${failedPlayer} FAILED!`;
+        el.finishSub.textContent = reasonText;
+        el.finishDetail.textContent = `${winnerText} (${maxScore}) | ${entries.map((e) => `${e.name}: ${e.score}`).join(" | ")}`;
+
+        const colors = ["#ff3b30", "#d7263d", "#8d99ae", "#2b2d42", "#edf2f4"];
+        for (let i = 0; i < 42; i += 1) {
+          const piece = document.createElement("div");
+          piece.className = "finish-piece";
+          piece.style.left = `${Math.random() * 100}%`;
+          piece.style.background = colors[i % colors.length];
+          piece.style.animationDuration = `${1.8 + Math.random() * 1.7}s, ${0.55 + Math.random() * 0.75}s`;
+          piece.style.animationDelay = `${Math.random() * 0.45}s, 0s`;
+          piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+          piece.style.opacity = `${0.55 + Math.random() * 0.35}`;
+          el.finishConfetti.appendChild(piece);
+        }
+
+        el.finishFx.classList.add("active");
+        el.finishFx.setAttribute("aria-hidden", "false");
+        state.finishFxTimer = setTimeout(() => {
+          el.finishFx.classList.remove("active");
+          el.finishFx.setAttribute("aria-hidden", "true");
+          el.finishConfetti.textContent = "";
+          state.finishFxTimer = null;
+        }, 4600);
+      };
+
+      const announceResults = () => {
+        const entries = state.players.map((name) => ({
+          name,
+          score: state.scores[name] || 0
+        }));
+        const maxScore = Math.max(...entries.map((e) => e.score));
+        const winners = entries.filter((e) => e.score === maxScore).map((e) => e.name);
+        appendLog(`[scores] ${entries.map((e) => `${e.name}=${e.score}`).join(", ")}`);
+        if (winners.length === 1) {
+          appendLog(`[WIN] ${winners[0]} (${maxScore})`);
+        } else {
+          appendLog(`[TIE] ${winners.join(", ")} (${maxScore})`);
+        }
+        return { entries, winners, maxScore };
+      };
+
+      const endGameWithZero = (player, reasonLog, fxReason) => {
+        state.gameOver = true;
+        state.scores[player] = 0;
+        renderScoreBoard();
+        appendLog(reasonLog);
+        const summary = announceResults();
+        showFinishFx(summary, fxReason, player);
+        setSyntax("Game Over", false);
+        el.runBtn.disabled = true;
+        el.lineInput.disabled = true;
+      };
+
+      const rejectPendingRequests = (message) => {
+        for (const [id, pending] of state.pendingRequests.entries()) {
+          if (pending.timer) clearTimeout(pending.timer);
+          pending.reject(new Error(message));
+          state.pendingRequests.delete(id);
+        }
+      };
+
+      const destroyWorker = (message) => {
+        if (state.worker) {
+          state.worker.terminate();
+          state.worker = null;
+        }
+        state.workerReady = false;
+        rejectPendingRequests(message || "Ruby worker terminated");
+      };
+
+      const buildWorkerSource = () => {
+        const pkgUrl = JSON.stringify(RUBY_PACKAGE_URL);
+        const wasmUrl = JSON.stringify(RUBY_WASM_URL);
+        const bootCode = JSON.stringify(RUBY_BOOT_CODE);
+        return `
+"use strict";
+const RUBY_PACKAGE_URL = ${pkgUrl};
+const RUBY_WASM_URL = ${wasmUrl};
+const RUBY_BOOT_CODE = ${bootCode};
+
+let vm = null;
+
+const rubyResultToString = (value) => {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try {
+    if (typeof value.toJS === "function") {
+      const jsValue = value.toJS();
+      if (jsValue == null) return "";
+      if (typeof jsValue === "string") return jsValue;
+      return String(jsValue);
+    }
+  } catch (_) {}
+  try {
+    if (typeof value.toString === "function") return value.toString();
+  } catch (_) {}
+  return String(value);
+};
+
+const postCommandError = (id, error) => {
+  self.postMessage({ id, ok: false, error: String(error) });
+};
+
+const handleCommand = (data) => {
+  const { id, cmd, payload } = data;
+  if (!vm) {
+    postCommandError(id, "Ruby VM is not ready");
+    return;
+  }
+  try {
+    if (cmd === "syntax_check") {
+      const code = String((payload && payload.code) || "");
+      const raw = vm.eval("GCGame.syntax_check(" + JSON.stringify(code) + ")");
+      const result = JSON.parse(rubyResultToString(raw));
+      self.postMessage({ id, ok: true, result });
+      return;
+    }
+    if (cmd === "run_line") {
+      const code = String((payload && payload.code) || "");
+      const raw = vm.eval("GCGame.run_line(" + JSON.stringify(code) + ")");
+      const result = JSON.parse(rubyResultToString(raw));
+      self.postMessage({ id, ok: true, result });
+      return;
+    }
+    postCommandError(id, "Unknown command: " + cmd);
+  } catch (e) {
+    postCommandError(id, e);
+  }
+};
+
+self.onmessage = (event) => {
+  const data = event.data;
+  if (!data || data.type !== "command") return;
+  handleCommand(data);
+};
+
+(async () => {
+  try {
+    importScripts(RUBY_PACKAGE_URL);
+    const pkg = self["ruby-wasm-wasi"];
+    if (!pkg || !pkg.DefaultRubyVM) {
+      throw new Error("ruby-wasm-wasi is not available in worker");
+    }
+    const response = await fetch(RUBY_WASM_URL);
+    const bytes = await response.arrayBuffer();
+    const mod = await WebAssembly.compile(bytes);
+    const runtime = await pkg.DefaultRubyVM(mod);
+    vm = runtime.vm;
+    vm.eval(RUBY_BOOT_CODE);
+    self.postMessage({ type: "ready" });
+  } catch (e) {
+    self.postMessage({ type: "boot_error", error: String(e) });
+  }
+})();
+`;
+      };
+
+      const createWorker = () => {
+        const source = buildWorkerSource();
+        const blob = new Blob([source], { type: "text/javascript" });
+        const url = URL.createObjectURL(blob);
+        const worker = new Worker(url);
+        URL.revokeObjectURL(url);
+        return worker;
+      };
+
+      const initRubyWorker = () => {
+        destroyWorker("Ruby worker restarting");
+        const worker = createWorker();
+        state.worker = worker;
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          worker.onmessage = (event) => {
+            const data = event.data || {};
+            if (data.type === "ready") {
+              state.workerReady = true;
+              if (!settled) {
+                settled = true;
+                resolve();
+              }
+              return;
+            }
+            if (data.type === "boot_error") {
+              state.workerReady = false;
+              if (!settled) {
+                settled = true;
+                reject(new Error(data.error || "Ruby worker boot failed"));
+              } else {
+                appendLog(`[system] worker boot error: ${String(data.error)}`);
+              }
+              return;
+            }
+            if (typeof data.id !== "number") return;
+            const pending = state.pendingRequests.get(data.id);
+            if (!pending) return;
+            state.pendingRequests.delete(data.id);
+            if (pending.timer) clearTimeout(pending.timer);
+            if (data.ok) {
+              pending.resolve(data.result);
+            } else {
+              pending.reject(new Error(data.error || "worker command failed"));
+            }
+          };
+          worker.onerror = (event) => {
+            const message = event && event.message ? event.message : "Ruby worker error";
+            state.workerReady = false;
+            rejectPendingRequests(message);
+            if (!settled) {
+              settled = true;
+              reject(new Error(message));
+            }
+          };
+        });
+      };
+
+      const sendWorkerCommand = (cmd, payload, timeoutMs = 0) => {
+        if (!state.worker || !state.workerReady) {
+          return Promise.reject(new Error("Ruby VM is not ready"));
+        }
+        return new Promise((resolve, reject) => {
+          const id = ++state.requestSeq;
+          const timer = timeoutMs > 0
+            ? setTimeout(() => {
+                state.pendingRequests.delete(id);
+                const timeoutError = new Error(`Command timed out after ${timeoutMs}ms`);
+                timeoutError.code = "TIMEOUT";
+                reject(timeoutError);
+              }, timeoutMs)
+            : null;
+          state.pendingRequests.set(id, { resolve, reject, timer });
+          try {
+            state.worker.postMessage({ type: "command", id, cmd, payload });
+          } catch (e) {
+            state.pendingRequests.delete(id);
+            if (timer) clearTimeout(timer);
+            reject(e);
+          }
+        });
+      };
+
+      const checkSyntax = async (code, syntaxSeq) => {
+        const result = await sendWorkerCommand("syntax_check", { code }, 1500);
+        if (syntaxSeq !== state.syntaxSeq) return;
         if (result.ok) {
           state.syntaxOK = true;
-          setSyntax("OK", true);
+          setSyntax("Valid", true);
         } else {
           state.syntaxOK = false;
-          setSyntax("NG: " + (result.error || "SyntaxError"), false);
+          setSyntax("Invalid: " + (result.error || "SyntaxError"), false);
         }
-        el.runBtn.disabled = !state.syntaxOK || state.gameOver;
+        el.runBtn.disabled = !state.syntaxOK || state.gameOver || state.runInFlight;
       };
 
       const onLineInput = () => {
@@ -361,90 +787,117 @@ Carol</textarea>
         el.runBtn.disabled = true;
 
         if (!code.trim()) {
-          setSyntax("未入力", null);
+          setSyntax("No input", null);
           return;
         }
 
-        setSyntax("チェック中...", null);
+        setSyntax("Validating...", null);
         clearTimeout(state.checkTimer);
+        const syntaxSeq = ++state.syntaxSeq;
         state.checkTimer = setTimeout(() => {
-          checkSyntax(code).catch((e) => {
+          checkSyntax(code, syntaxSeq).catch((e) => {
+            if (syntaxSeq !== state.syntaxSeq) return;
             state.syntaxOK = false;
-            setSyntax("NG: チェック失敗", false);
+            setSyntax("Validation failed", false);
             appendLog(`[system] syntax check failed: ${String(e)}`);
           });
         }, 120);
       };
 
       const runTurn = async () => {
-        if (state.gameOver || !state.syntaxOK) return;
-        const code = el.lineInput.value;
-        const player = state.players[state.current];
-        state.turn += 1;
-        updateTurnView();
-
-        const raw = state.vm.eval(
-          `GCGame.run_line(${JSON.stringify(code)})`
-        );
-        const result = JSON.parse(rubyResultToString(raw));
-
-        appendLog(`[turn ${state.turn}] ${player}> ${code}`);
-        if (result.status === "ok") {
-          appendLog(`=> ${result.value}`);
-        } else {
-          appendLog(`!! ${result.error}`);
-        }
-        state.scores[player] = (state.scores[player] || 0) + (result.alloc_delta || 0);
-        state.gcProgress += (result.gc_delta || 0);
-        appendLog(`[score] +${result.alloc_delta} objects, GC +${result.gc_delta}`);
-        updateGCWindow(result.gc_stat_after);
-        updateProgressView();
-        renderScoreBoard();
-
-        if (state.gcProgress >= state.gcTarget) {
-          state.gameOver = true;
-          state.scores[player] = 0;
-          renderScoreBoard();
-          appendLog(
-            `[LOSE] ${player} が最後のGCを起こしたためスコア0 (${result.gc_before} -> ${result.gc_after})`
-          );
-          const entries = state.players.map((name) => ({
-            name,
-            score: state.scores[name] || 0
-          }));
-          const maxScore = Math.max(...entries.map((e) => e.score));
-          const winners = entries.filter((e) => e.score === maxScore).map((e) => e.name);
-          appendLog(`[result] ${entries.map((e) => `${e.name}=${e.score}`).join(", ")}`);
-          if (winners.length === 1) {
-            appendLog(`[WIN] ${winners[0]} (${maxScore})`);
-          } else {
-            appendLog(`[DRAW] ${winners.join(", ")} (${maxScore})`);
-          }
-          setSyntax("ゲーム終了", false);
-          el.runBtn.disabled = true;
-          el.lineInput.disabled = true;
+        if (state.gameOver || !state.syntaxOK || state.runInFlight) return;
+        if (!state.workerReady) {
+          appendLog("[system] Ruby VM is not ready.");
           return;
         }
 
-        appendLog(`[progress] GC count: ${result.gc_before} -> ${result.gc_after} (total +${state.gcProgress})`);
-
-        state.current = (state.current + 1) % state.players.length;
+        const code = el.lineInput.value;
+        const player = state.players[state.current];
+        state.runInFlight = true;
+        state.turn += 1;
         updateTurnView();
-        renderScoreBoard();
-        el.lineInput.value = "";
-        state.syntaxOK = false;
+        appendLog(`[turn ${state.turn}] ${player}> ${code}`);
         el.runBtn.disabled = true;
-        setSyntax("未入力", null);
-        el.lineInput.focus();
+        el.lineInput.disabled = true;
+        el.resetBtn.disabled = true;
+
+        try {
+          const result = await sendWorkerCommand("run_line", { code }, EXEC_TIMEOUT_MS);
+          if (result.status === "ok") {
+            appendLog(`=> ${result.value}`);
+          } else {
+            appendLog(`!! ${result.error}`);
+          }
+          state.scores[player] = (state.scores[player] || 0) + (result.alloc_delta || 0);
+          state.gcProgress += (result.gc_delta || 0);
+          appendLog(`[score] allocated +${result.alloc_delta}, GC +${result.gc_delta}`);
+          updateGCWindow(result.gc_stat_after);
+          updateProgressView();
+          renderScoreBoard();
+
+          if (state.gcProgress >= state.gcTarget) {
+            endGameWithZero(
+              player,
+              `[LOSE] ${player} triggered the final GC; score reset to 0 (${result.gc_before} -> ${result.gc_after})`,
+              `${player} triggered the final GC and lost all points.`
+            );
+            return;
+          }
+
+          appendLog(`[progress] GC count ${result.gc_before} -> ${result.gc_after} | total ${state.gcProgress}/${state.gcTarget}`);
+
+          state.current = (state.current + 1) % state.players.length;
+          updateTurnView();
+          renderScoreBoard();
+          el.lineInput.value = "";
+          state.syntaxOK = false;
+          el.runBtn.disabled = true;
+          setSyntax("No input", null);
+          el.lineInput.disabled = false;
+          el.lineInput.focus();
+        } catch (e) {
+          if (e && e.code === "TIMEOUT") {
+            destroyWorker("Ruby worker timed out");
+            el.bootState.textContent = "Ruby VM stopped (timeout)";
+            endGameWithZero(
+              player,
+              `[LOSE] ${player} exceeded ${(EXEC_TIMEOUT_MS / 1000).toFixed(1)}s execution time; score reset to 0`,
+              `${player} exceeded ${(EXEC_TIMEOUT_MS / 1000).toFixed(1)} seconds and lost all points.`
+            );
+            return;
+          }
+          appendLog(`[system] run failed: ${String(e)}`);
+          el.lineInput.disabled = false;
+          el.runBtn.disabled = !state.syntaxOK || state.gameOver;
+        } finally {
+          state.runInFlight = false;
+          el.resetBtn.disabled = false;
+        }
       };
 
-      const startGame = () => {
+      const startGame = async () => {
+        if (!state.workerReady) {
+          el.startBtn.disabled = true;
+          el.bootState.textContent = "Booting Ruby VM...";
+          try {
+            await initRubyWorker();
+            el.bootState.textContent = "Ruby VM ready";
+            appendLog("[system] Ruby VM ready");
+          } catch (e) {
+            el.bootState.textContent = "Ruby VM boot failed";
+            appendLog(`[system] boot failed: ${String(e)}`);
+            return;
+          } finally {
+            el.startBtn.disabled = false;
+          }
+        }
+
         const names = parsePlayers();
         const targetRaw = Number.parseInt(el.gcTarget.value, 10);
         const target = Number.isFinite(targetRaw) && targetRaw > 0 ? targetRaw : 1;
         el.gcTarget.value = String(target);
         if (names.length < 2) {
-          appendLog("[system] プレイヤーは2人以上必要です。");
+          appendLog("[system] At least 2 players are required.");
           return;
         }
         state.players = names;
@@ -455,16 +908,18 @@ Carol</textarea>
         state.scores = Object.fromEntries(names.map((name) => [name, 0]));
         state.gameOver = false;
         state.syntaxOK = false;
+        state.runInFlight = false;
+        clearFinishFx();
         el.log.textContent = "";
         updateGCWindow(null);
         updateTurnView();
         updateProgressView();
         renderScoreBoard();
-        setSyntax("未入力", null);
+        setSyntax("No input", null);
         el.lineInput.value = "";
         el.lineInput.disabled = false;
         el.runBtn.disabled = true;
-        appendLog(`[system] game start: ${names.join(", ")} / target GC: ${target}`);
+        appendLog(`[system] Game started: ${names.join(", ")} (target GC: ${target})`);
         el.lineInput.focus();
       };
 
@@ -476,82 +931,22 @@ Carol</textarea>
         state.scores = {};
         state.gameOver = false;
         state.syntaxOK = false;
+        state.runInFlight = false;
+        clearFinishFx();
         updateTurnView();
         updateProgressView();
         renderScoreBoard();
         el.lineInput.value = "";
         el.lineInput.disabled = true;
         el.runBtn.disabled = true;
-        setSyntax("未入力", null);
+        setSyntax("No input", null);
         updateGCWindow(null);
-        appendLog("[system] reset");
+        appendLog("[system] Game reset.");
       };
 
-      const initRuby = async () => {
-        const pkg = window["ruby-wasm-wasi"];
-        if (!pkg || !pkg.DefaultRubyVM) {
-          throw new Error("ruby-wasm-wasi is not available");
-        }
-        const wasmUrl = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/ruby+stdlib.wasm";
-        const response = await fetch(wasmUrl);
-        const bytes = await response.arrayBuffer();
-        const mod = await WebAssembly.compile(bytes);
-        const { vm } = await pkg.DefaultRubyVM(mod);
-        state.vm = vm;
-        vm.eval(`
-          require "json"
-
-          module GCGame
-            class << self
-              def syntax_error(line)
-                RubyVM::InstructionSequence.compile(line)
-                nil
-              rescue SyntaxError => e
-                first = e.message.to_s.lines.first
-                (first || e.message).to_s.strip
-              end
-
-              def syntax_check(line)
-                err = syntax_error(line)
-                { ok: err.nil?, error: err }.to_json
-              end
-
-              def run_line(line)
-                before_stat = GC.stat
-                before = before_stat[:count]
-                before_alloc = before_stat[:total_allocated_objects]
-                value = nil
-                error = nil
-                ok = true
-
-                begin
-                  value = TOPLEVEL_BINDING.eval(line, "(gc-game)", 1)
-                rescue Exception => e
-                  ok = false
-                  error = "#{e.class}: #{e.message}"
-                end
-
-                after_stat = GC.stat
-                after = after_stat[:count]
-                after_alloc = after_stat[:total_allocated_objects]
-                {
-                  status: ok ? "ok" : "error",
-                  value: ok ? value.inspect : nil,
-                  error: error,
-                  gc_before: before,
-                  gc_after: after,
-                  gc_happened: after > before,
-                  gc_delta: after - before,
-                  alloc_delta: after_alloc - before_alloc,
-                  gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
-                }.to_json
-              end
-            end
-          end
-        `);
-      };
-
-      el.startBtn.addEventListener("click", startGame);
+      el.startBtn.addEventListener("click", () => {
+        startGame().catch((e) => appendLog(`[system] start failed: ${String(e)}`));
+      });
       el.resetBtn.addEventListener("click", resetGame);
       el.lineInput.addEventListener("input", onLineInput);
       el.runBtn.addEventListener("click", () => {
@@ -567,12 +962,12 @@ Carol</textarea>
 
       (async () => {
         try {
-          await initRuby();
-          el.bootState.textContent = "Ruby VM 起動完了";
+          await initRubyWorker();
+          el.bootState.textContent = "Ruby VM ready";
           el.startBtn.disabled = false;
           appendLog("[system] Ruby VM ready");
         } catch (e) {
-          el.bootState.textContent = "Ruby VM 起動失敗";
+          el.bootState.textContent = "Ruby VM boot failed";
           appendLog(`[system] boot failed: ${String(e)}`);
         }
       })();

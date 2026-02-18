@@ -25,7 +25,8 @@ The game tracks object allocations and garbage collection (GC), then decides the
 7. The game keeps a global `gcProgress` as the sum of all `gc_delta`.
 8. When `gcProgress >= n`, the game ends immediately.
 9. The player who triggered the final GC progress (the last turn player) gets score `0`.
-10. The highest score wins. If multiple players tie for highest score, the result is a draw.
+10. If a turn execution exceeds 3 seconds, that player immediately gets score `0` and the game ends.
+11. The highest score wins. If multiple players tie for highest score, the result is a draw.
 
 ## 3. Syntax Validation
 
