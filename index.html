@@ -133,9 +133,89 @@
       max-height: 420px;
       overflow: auto;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      white-space: pre-wrap;
       line-height: 1.35;
       font-size: 12px;
+    }
+
+    .heap-empty {
+      color: #9eb0c8;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .heap-viz {
+      display: grid;
+      gap: 10px;
+    }
+
+    .heap-kpis {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .heap-kpi {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .heap-kpi.total {
+      color: #d5ef9d;
+    }
+
+    .heap-kpi.gc {
+      color: #ffb3c7;
+    }
+
+    .heap-stack {
+      height: 16px;
+      width: 100%;
+      display: flex;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .heap-seg-live {
+      background: linear-gradient(90deg, #ff9f43, #ffcc80);
+      min-width: 2px;
+      transition: width 180ms ease;
+    }
+
+    .heap-seg-free {
+      background: linear-gradient(90deg, #53a7ff, #a5d9ff);
+      min-width: 2px;
+      transition: width 180ms ease;
+    }
+
+    .heap-ratio {
+      font-size: 11px;
+      color: #afc4dd;
+    }
+
+    .heap-trend {
+      height: 76px;
+      display: grid;
+      grid-template-columns: repeat(20, minmax(0, 1fr));
+      gap: 4px;
+      align-items: end;
+      padding: 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .heap-trend-bar {
+      width: 100%;
+      border-radius: 2px 2px 0 0;
+      background: linear-gradient(180deg, #ffbf66, #63b3ff);
+      transition: height 160ms ease, opacity 160ms ease;
     }
 
     @media (max-width: 860px) {
@@ -448,10 +528,30 @@ Carol</textarea>
 
       <section class="panel">
         <div class="row" style="justify-content:space-between;">
-          <strong>GC.stat</strong>
-          <span class="meta">After latest turn</span>
+          <strong>Heap Slots</strong>
+          <span class="meta">live/free visualization</span>
         </div>
-        <pre id="gcStat" class="gc-window">No turns executed yet.</pre>
+        <div id="heapWindow" class="gc-window">
+          <div id="heapEmpty" class="heap-empty">No turns executed yet.</div>
+          <div id="heapViz" class="heap-viz" hidden>
+            <div class="heap-kpis">
+              <div class="heap-kpi gc">
+                <span>gc count</span>
+                <strong id="heapGcCountVal">0</strong>
+              </div>
+              <div class="heap-kpi total">
+                <span>heap available slots</span>
+                <strong id="heapAvailableVal">0</strong>
+              </div>
+            </div>
+            <div class="heap-stack" aria-label="heap live and free ratio">
+              <div id="heapLiveBar" class="heap-seg-live" style="width:50%"></div>
+              <div id="heapFreeBar" class="heap-seg-free" style="width:50%"></div>
+            </div>
+            <div id="heapRatio" class="heap-ratio">live 0% / free 0%</div>
+            <div id="heapTrend" class="heap-trend" aria-label="recent heap trend"></div>
+          </div>
+        </div>
       </section>
     </div>
   </main>
@@ -501,6 +601,7 @@ Carol</textarea>
             def run_line(line)
               before_stat = GC.stat
               before = before_stat[:count]
+              before_alloc = before_stat[:total_allocated_objects] || 0
               value = nil
               error = nil
               ok = true
@@ -514,6 +615,7 @@ Carol</textarea>
 
               after_stat = GC.stat
               after = after_stat[:count]
+              after_alloc = after_stat[:total_allocated_objects] || before_alloc
               {
                 status: ok ? "ok" : "error",
                 value: ok ? value.inspect : nil,
@@ -522,8 +624,13 @@ Carol</textarea>
                 gc_after: after,
                 gc_happened: after > before,
                 gc_delta: after - before,
+                alloc_delta: [after_alloc - before_alloc, 0].max,
                 gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
               }.to_json
+            end
+
+            def gc_stat
+              GC.stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }.to_json
             end
           end
         end
@@ -542,7 +649,14 @@ Carol</textarea>
         scoreBoard: document.getElementById("scoreBoard"),
         runBtn: document.getElementById("runBtn"),
         log: document.getElementById("log"),
-        gcStat: document.getElementById("gcStat"),
+        heapEmpty: document.getElementById("heapEmpty"),
+        heapViz: document.getElementById("heapViz"),
+        heapGcCountVal: document.getElementById("heapGcCountVal"),
+        heapAvailableVal: document.getElementById("heapAvailableVal"),
+        heapLiveBar: document.getElementById("heapLiveBar"),
+        heapFreeBar: document.getElementById("heapFreeBar"),
+        heapRatio: document.getElementById("heapRatio"),
+        heapTrend: document.getElementById("heapTrend"),
         outFx: document.getElementById("outFx"),
         outShards: document.getElementById("outShards"),
         outLabel: document.getElementById("outLabel"),
@@ -558,6 +672,10 @@ Carol</textarea>
         rubyInfo: null,
         requestSeq: 0,
         pendingRequests: new Map(),
+        syntaxWorker: null,
+        syntaxWorkerReady: false,
+        syntaxRequestSeq: 0,
+        syntaxPendingRequests: new Map(),
         players: [],
         current: -1,
         turn: 0,
@@ -570,6 +688,7 @@ Carol</textarea>
         roundQueue: [],
         initialPlayers: 0,
         executedLines: [],
+        heapHistory: [],
         gameOver: false,
         syntaxOK: false,
         checkTimer: null,
@@ -592,12 +711,61 @@ Carol</textarea>
         el.log.scrollTop = el.log.scrollHeight;
       };
 
+      const formatNumber = (n) => new Intl.NumberFormat("en-US").format(Number(n) || 0);
+
+      const renderHeapTrend = () => {
+        el.heapTrend.textContent = "";
+        if (state.heapHistory.length === 0) return;
+        const maxTotal = Math.max(
+          ...state.heapHistory.map((h) => h.live + h.free),
+          1
+        );
+        const bars = state.heapHistory.slice(-20);
+        for (const point of bars) {
+          const total = point.live + point.free;
+          const liveRatio = total > 0 ? point.live / total : 0;
+          const livePctInt = Math.round(liveRatio * 100);
+          const freePctInt = 100 - livePctInt;
+          const bar = document.createElement("span");
+          bar.className = "heap-trend-bar";
+          bar.style.height = `${14 + liveRatio * 86}%`;
+          bar.style.opacity = `${0.35 + (total / maxTotal) * 0.65}`;
+          bar.title = `live ${livePctInt}% / free ${freePctInt}%`;
+          el.heapTrend.appendChild(bar);
+        }
+      };
+
       const updateGCWindow = (gcStat) => {
         if (!gcStat) {
-          el.gcStat.textContent = "No turns executed yet.";
+          state.heapHistory = [];
+          el.heapEmpty.hidden = false;
+          el.heapViz.hidden = true;
+          el.heapTrend.textContent = "";
           return;
         }
-        el.gcStat.textContent = JSON.stringify(gcStat, null, 2);
+        const live = Math.max(0, Number(gcStat.heap_live_slots || 0));
+        const free = Math.max(0, Number(gcStat.heap_free_slots || 0));
+        const gcCount = Math.max(0, Number(gcStat.count || 0));
+        const availableRaw = Math.max(0, Number(gcStat.heap_available_slots || 0));
+        const total = Math.max(1, live + free);
+        const livePct = (live / total) * 100;
+        const freePct = 100 - livePct;
+        const livePctInt = Math.round(livePct);
+        const freePctInt = 100 - livePctInt;
+
+        state.heapHistory.push({ live, free });
+        if (state.heapHistory.length > 20) {
+          state.heapHistory = state.heapHistory.slice(-20);
+        }
+
+        el.heapEmpty.hidden = true;
+        el.heapViz.hidden = false;
+        el.heapGcCountVal.textContent = formatNumber(gcCount);
+        el.heapAvailableVal.textContent = availableRaw > 0 ? formatNumber(availableRaw) : "-";
+        el.heapLiveBar.style.width = `${livePct.toFixed(2)}%`;
+        el.heapFreeBar.style.width = `${freePct.toFixed(2)}%`;
+        el.heapRatio.textContent = `live ${livePctInt}% / free ${freePctInt}%`;
+        renderHeapTrend();
       };
 
       const setSyntax = (text, ok) => {
@@ -818,11 +986,11 @@ Carol</textarea>
         el.lineInput.disabled = true;
       };
 
-      const rejectPendingRequests = (message) => {
-        for (const [id, pending] of state.pendingRequests.entries()) {
+      const rejectPendingRequests = (pendingMap, message) => {
+        for (const [id, pending] of pendingMap.entries()) {
           if (pending.timer) clearTimeout(pending.timer);
           pending.reject(new Error(message));
-          state.pendingRequests.delete(id);
+          pendingMap.delete(id);
         }
       };
 
@@ -833,7 +1001,16 @@ Carol</textarea>
         }
         state.workerReady = false;
         state.rubyInfo = null;
-        rejectPendingRequests(message || "Ruby worker terminated");
+        rejectPendingRequests(state.pendingRequests, message || "Ruby worker terminated");
+      };
+
+      const destroySyntaxWorker = (message) => {
+        if (state.syntaxWorker) {
+          state.syntaxWorker.terminate();
+          state.syntaxWorker = null;
+        }
+        state.syntaxWorkerReady = false;
+        rejectPendingRequests(state.syntaxPendingRequests, message || "Syntax worker terminated");
       };
 
       const buildWorkerSource = () => {
@@ -886,6 +1063,12 @@ const handleCommand = (data) => {
     if (cmd === "run_line") {
       const code = String((payload && payload.code) || "");
       const raw = vm.eval("GCGame.run_line(" + JSON.stringify(code) + ")");
+      const result = JSON.parse(rubyResultToString(raw));
+      self.postMessage({ id, ok: true, result });
+      return;
+    }
+    if (cmd === "gc_stat") {
+      const raw = vm.eval("GCGame.gc_stat()");
       const result = JSON.parse(rubyResultToString(raw));
       self.postMessage({ id, ok: true, result });
       return;
@@ -977,7 +1160,56 @@ self.onmessage = (event) => {
           worker.onerror = (event) => {
             const message = event && event.message ? event.message : "Ruby worker error";
             state.workerReady = false;
-            rejectPendingRequests(message);
+            rejectPendingRequests(state.pendingRequests, message);
+            if (!settled) {
+              settled = true;
+              reject(new Error(message));
+            }
+          };
+        });
+      };
+
+      const initSyntaxWorker = () => {
+        destroySyntaxWorker("Syntax worker restarting");
+        const worker = createWorker();
+        state.syntaxWorker = worker;
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          worker.onmessage = (event) => {
+            const data = event.data || {};
+            if (data.type === "ready") {
+              state.syntaxWorkerReady = true;
+              if (!settled) {
+                settled = true;
+                resolve();
+              }
+              return;
+            }
+            if (data.type === "boot_error") {
+              state.syntaxWorkerReady = false;
+              if (!settled) {
+                settled = true;
+                reject(new Error(data.error || "Syntax worker boot failed"));
+              } else {
+                appendLog(`[system] syntax worker boot error: ${String(data.error)}`);
+              }
+              return;
+            }
+            if (typeof data.id !== "number") return;
+            const pending = state.syntaxPendingRequests.get(data.id);
+            if (!pending) return;
+            state.syntaxPendingRequests.delete(data.id);
+            if (pending.timer) clearTimeout(pending.timer);
+            if (data.ok) {
+              pending.resolve(data.result);
+            } else {
+              pending.reject(new Error(data.error || "syntax worker command failed"));
+            }
+          };
+          worker.onerror = (event) => {
+            const message = event && event.message ? event.message : "Syntax worker error";
+            state.syntaxWorkerReady = false;
+            rejectPendingRequests(state.syntaxPendingRequests, message);
             if (!settled) {
               settled = true;
               reject(new Error(message));
@@ -1011,8 +1243,34 @@ self.onmessage = (event) => {
         });
       };
 
+      const sendSyntaxWorkerCommand = (cmd, payload, timeoutMs = 0) => {
+        if (!state.syntaxWorker || !state.syntaxWorkerReady) {
+          return Promise.reject(new Error("Syntax VM is not ready"));
+        }
+        return new Promise((resolve, reject) => {
+          const id = ++state.syntaxRequestSeq;
+          const timer = timeoutMs > 0
+            ? setTimeout(() => {
+                state.syntaxPendingRequests.delete(id);
+                reject(new Error(`Syntax command timed out after ${timeoutMs}ms`));
+              }, timeoutMs)
+            : null;
+          state.syntaxPendingRequests.set(id, { resolve, reject, timer });
+          try {
+            state.syntaxWorker.postMessage({ type: "command", id, cmd, payload });
+          } catch (e) {
+            state.syntaxPendingRequests.delete(id);
+            if (timer) clearTimeout(timer);
+            reject(e);
+          }
+        });
+      };
+
       const checkSyntax = async (code, syntaxSeq) => {
-        const result = await sendWorkerCommand("syntax_check", { code }, 1500);
+        if (!state.syntaxWorkerReady) {
+          await initSyntaxWorker();
+        }
+        const result = await sendSyntaxWorkerCommand("syntax_check", { code }, 1500);
         if (syntaxSeq !== state.syntaxSeq) return;
         if (result.ok) {
           state.syntaxOK = true;
@@ -1078,12 +1336,14 @@ self.onmessage = (event) => {
           } else {
             appendLog(`!! ${result.error}`);
           }
+          const allocDelta = Math.max(0, Number(result.alloc_delta || 0));
+          appendLog(`📦 [alloc] +${formatNumber(allocDelta)} objects`);
           updateGCWindow(result.gc_stat_after);
           const gcDelta = Number(result.gc_delta || 0);
           if (gcDelta > 0) {
             eliminatePlayer(currentIdx, "GC");
             showOutFx();
-            appendLog(`💥 [FAIL] ${player} triggered GC (${result.gc_before} -> ${result.gc_after}) and is OUT`);
+            appendLog(`💥 [FAIL] ${player} triggered GC (+${gcDelta}) and is OUT`);
             updateProgressView();
             renderScoreBoard();
             await waitOutFx();
@@ -1106,7 +1366,7 @@ self.onmessage = (event) => {
             return;
           }
 
-          appendLog(`🟢 [safe] no GC (${result.gc_before} -> ${result.gc_after})`);
+          appendLog("🟢 [safe] no GC during this turn");
           updateProgressView();
           renderScoreBoard();
 
@@ -1186,6 +1446,14 @@ self.onmessage = (event) => {
             el.startBtn.disabled = false;
           }
         }
+        if (!state.syntaxWorkerReady) {
+          try {
+            await initSyntaxWorker();
+          } catch (e) {
+            appendLog(`[system] syntax VM boot failed: ${String(e)}`);
+            return;
+          }
+        }
 
         const names = parsePlayers();
         const target = Math.max(1, names.length - 1);
@@ -1215,7 +1483,13 @@ self.onmessage = (event) => {
         if (names.length === 1) {
           appendLog("[system] Solo mode: one safe turn ends the game.");
         }
-        updateGCWindow(null);
+        try {
+          const initialStat = await sendWorkerCommand("gc_stat", {}, 1500);
+          updateGCWindow(initialStat);
+        } catch (e) {
+          updateGCWindow(null);
+          appendLog(`[system] heap stats init failed: ${String(e)}`);
+        }
         ensureCurrentTurn();
         updateTurnView();
         updateProgressView();
@@ -1275,6 +1549,7 @@ self.onmessage = (event) => {
       (async () => {
         try {
           await initRubyWorker();
+          await initSyntaxWorker();
           el.bootState.textContent = formatRubyInfo();
           el.startBtn.disabled = false;
           appendLog(`[system] ${formatRubyInfo()}`);

@@ -32,4 +32,12 @@ Open `http://localhost:8000` in your browser.
 4. If a turn takes more than 3 seconds, that player is eliminated.
 5. Turn order reverses every round.
 6. Failure target is auto-calculated as `n = max(1, players - 1)`.
-7. Last survivor wins.
+7. Game ends when one survivor remains (or no survivors).
+8. Game log shows per-turn allocated object delta (`+N objects`).
+9. Syntax checks run in a separate Ruby VM worker.
+
+## Heap Panel
+
+- Right panel shows heap as a live/free bar + recent trend.
+- Live/free are shown only as integer percentages.
+- `heap_available_slots` is shown as a numeric value.
