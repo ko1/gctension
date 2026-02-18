@@ -161,6 +161,109 @@
       min-height: 92px;
     }
 
+    .out-fx {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 60ms ease;
+    }
+
+    .out-fx::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      background:
+        radial-gradient(500px 260px at 50% 50%, rgba(255, 120, 60, 0.38), transparent 68%),
+        rgba(120, 10, 10, 0.12);
+    }
+
+    .out-fx.active {
+      opacity: 1;
+    }
+
+    .out-fx.active::before {
+      animation: outScreenFlash 220ms ease-out;
+    }
+
+    .out-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+    }
+
+    .out-core {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: radial-gradient(circle, #fff 0%, #ffd8a8 35%, #ff6b35 70%, #d90429 100%);
+      filter: blur(0.2px);
+    }
+
+    .out-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 3px solid rgba(255, 120, 80, 0.8);
+      transform: translate(-50%, -50%);
+    }
+
+    .out-shards {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .out-shard {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      background: #ff5d00;
+      transform: translate(-50%, -50%);
+      clip-path: polygon(50% 0%, 100% 50%, 60% 100%, 0% 70%);
+      animation: outShard 310ms cubic-bezier(.18,.67,.37,1) forwards;
+      box-shadow: 0 0 10px rgba(255, 71, 26, 0.45);
+    }
+
+    .out-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      margin-top: 72px;
+      font-size: clamp(24px, 5vw, 42px);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #fff6f3;
+      text-shadow:
+        0 3px 0 rgba(0, 0, 0, 0.2),
+        0 10px 26px rgba(220, 20, 20, 0.55);
+      white-space: nowrap;
+    }
+
+    .out-fx.active .out-core {
+      animation: outCore 210ms ease-out forwards;
+    }
+
+    .out-fx.active .out-ring {
+      animation: outRing 280ms ease-out forwards;
+    }
+
+    .out-fx.active .out-label {
+      animation: outLabel 310ms ease-out forwards;
+    }
+
     .finish-fx {
       position: fixed;
       inset: 0;
@@ -228,34 +331,6 @@
       white-space: pre-wrap;
     }
 
-    .finish-confetti {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-    }
-
-    .finish-piece {
-      position: absolute;
-      width: 9px;
-      height: 14px;
-      border-radius: 1px;
-      opacity: 0.88;
-      top: -24px;
-      clip-path: polygon(50% 0%, 100% 38%, 72% 100%, 0% 78%);
-      animation: crashFall linear forwards, spinOut ease-in-out infinite alternate;
-      box-shadow: 0 0 10px rgba(255, 60, 60, 0.2);
-    }
-
-    @keyframes crashFall {
-      from { transform: translateY(-6vh) rotate(0deg); }
-      to { transform: translateY(120vh) rotate(980deg); }
-    }
-
-    @keyframes spinOut {
-      from { margin-left: -9px; }
-      to { margin-left: 9px; }
-    }
-
     @keyframes finishPulse {
       0% { transform: scale(1.04); }
       100% { transform: scale(1); }
@@ -274,13 +349,46 @@
       0% { background-color: rgba(255, 70, 70, 0.25); }
       100% { background-color: transparent; }
     }
+
+    @keyframes outCore {
+      0% { transform: scale(0.1); opacity: 1; }
+      70% { transform: scale(2.6); opacity: 0.94; }
+      100% { transform: scale(3.2); opacity: 0; }
+    }
+
+    @keyframes outRing {
+      0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scale(16); opacity: 0; }
+    }
+
+    @keyframes outShard {
+      0% {
+        transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(0.6);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.25);
+        opacity: 0;
+      }
+    }
+
+    @keyframes outLabel {
+      0% { opacity: 0; transform: translate(-50%, calc(-50% + 14px)) scale(0.85); }
+      30% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+      100% { opacity: 0; transform: translate(-50%, calc(-50% - 10px)) scale(0.98); }
+    }
+
+    @keyframes outScreenFlash {
+      0% { opacity: 0.9; }
+      100% { opacity: 0; }
+    }
   </style>
 </head>
 <body>
   <main class="wrap">
     <section class="panel">
       <h1>GC Surface Tension Game</h1>
-      <p>Compete on object allocations until the n-th GC occurs. Exceed 3 seconds on a turn and your score becomes 0.</p>
+      <p>Last-survivor mode: trigger GC or exceed 3 seconds and you are eliminated. Turn order reverses every round.</p>
     </section>
 
     <section class="panel">
@@ -288,14 +396,11 @@
         <strong>Setup</strong>
         <span id="bootState" class="meta">Booting Ruby VM...</span>
       </div>
-      <label for="players">Player names (one per line, minimum 2)</label>
+      <label for="players">Player names (one per line, minimum 1)</label>
       <textarea id="players">Alice
 Bob
 Carol</textarea>
-      <div style="margin-top:10px;max-width:220px;">
-        <label for="gcTarget">GC target count n (>= 1)</label>
-        <input id="gcTarget" type="number" min="1" step="1" value="1">
-      </div>
+      <div class="meta" style="margin-top:10px;">Auto rule: <code>n = max(1, players - 1)</code></div>
       <div class="row" style="margin-top:10px;">
         <button id="startBtn" class="primary" disabled>Start Game</button>
         <button id="resetBtn">Reset</button>
@@ -325,10 +430,10 @@ Carol</textarea>
         <button id="runBtn" class="primary" disabled>Submit This Line</button>
       </div>
       <div class="row" style="margin-top:10px;">
-        <span class="meta">GC progress:</span>
+        <span class="meta">Failures:</span>
         <strong id="gcProgress">0 / -</strong>
       </div>
-      <div class="meta" style="margin-top:8px;">Scores (allocated objects)</div>
+      <div class="meta" style="margin-top:8px;">Player Status 🧭</div>
       <pre id="scoreBoard" class="score-board">Appears after game start.</pre>
     </section>
 
@@ -336,7 +441,7 @@ Carol</textarea>
       <section class="panel">
         <div class="row" style="justify-content:space-between;">
           <strong>Game Log</strong>
-          <span class="meta">Ends on n-th GC / final GC or 3s timeout -> score 0</span>
+          <span class="meta">GC or timeout -> eliminated / last survivor wins</span>
         </div>
         <pre id="log" class="log"></pre>
       </section>
@@ -350,11 +455,18 @@ Carol</textarea>
       </section>
     </div>
   </main>
+  <div id="outFx" class="out-fx" aria-hidden="true">
+    <div class="out-center">
+      <div class="out-core"></div>
+      <div class="out-ring"></div>
+    </div>
+    <div id="outShards" class="out-shards"></div>
+    <div id="outLabel" class="out-label"></div>
+  </div>
   <div id="finishFx" class="finish-fx" aria-hidden="true">
-    <div id="finishConfetti" class="finish-confetti"></div>
     <section class="finish-card">
       <p class="finish-kicker">Critical Failure</p>
-      <h2 id="finishTitle" class="finish-title">FAILED!</h2>
+      <h2 id="finishTitle" class="finish-title">GAME OVER</h2>
       <p id="finishSub" class="finish-sub"></p>
       <p id="finishDetail" class="finish-detail"></p>
     </section>
@@ -367,6 +479,7 @@ Carol</textarea>
       const RUBY_PACKAGE_URL = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/browser.umd.js";
       const RUBY_WASM_URL = "https://cdn.jsdelivr.net/npm/@ruby/4.0-wasm-wasi@2.8.1/dist/ruby+stdlib.wasm";
       const EXEC_TIMEOUT_MS = 3000;
+      const OUT_FX_HOLD_MS = 240;
       const RUBY_BOOT_CODE = `
         require "json"
 
@@ -388,7 +501,6 @@ Carol</textarea>
             def run_line(line)
               before_stat = GC.stat
               before = before_stat[:count]
-              before_alloc = before_stat[:total_allocated_objects]
               value = nil
               error = nil
               ok = true
@@ -402,7 +514,6 @@ Carol</textarea>
 
               after_stat = GC.stat
               after = after_stat[:count]
-              after_alloc = after_stat[:total_allocated_objects]
               {
                 status: ok ? "ok" : "error",
                 value: ok ? value.inspect : nil,
@@ -411,7 +522,6 @@ Carol</textarea>
                 gc_after: after,
                 gc_happened: after > before,
                 gc_delta: after - before,
-                alloc_delta: after_alloc - before_alloc,
                 gc_stat_after: after_stat.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
               }.to_json
             end
@@ -422,7 +532,6 @@ Carol</textarea>
       const el = {
         bootState: document.getElementById("bootState"),
         players: document.getElementById("players"),
-        gcTarget: document.getElementById("gcTarget"),
         startBtn: document.getElementById("startBtn"),
         resetBtn: document.getElementById("resetBtn"),
         turnName: document.getElementById("turnName"),
@@ -434,8 +543,10 @@ Carol</textarea>
         runBtn: document.getElementById("runBtn"),
         log: document.getElementById("log"),
         gcStat: document.getElementById("gcStat"),
+        outFx: document.getElementById("outFx"),
+        outShards: document.getElementById("outShards"),
+        outLabel: document.getElementById("outLabel"),
         finishFx: document.getElementById("finishFx"),
-        finishConfetti: document.getElementById("finishConfetti"),
         finishTitle: document.getElementById("finishTitle"),
         finishSub: document.getElementById("finishSub"),
         finishDetail: document.getElementById("finishDetail")
@@ -448,16 +559,23 @@ Carol</textarea>
         requestSeq: 0,
         pendingRequests: new Map(),
         players: [],
-        current: 0,
+        current: -1,
         turn: 0,
-        gcTarget: 1,
-        gcProgress: 0,
-        scores: {},
+        failTarget: 1,
+        failProgress: 0,
+        alive: [],
+        outReason: [],
+        direction: 1,
+        round: 0,
+        roundQueue: [],
+        initialPlayers: 0,
+        executedLines: [],
         gameOver: false,
         syntaxOK: false,
         checkTimer: null,
         syntaxSeq: 0,
         runInFlight: false,
+        outFxTimer: null,
         finishFxTimer: null
       };
 
@@ -489,14 +607,21 @@ Carol</textarea>
         if (ok === false) el.syntaxState.classList.add("ng");
       };
 
+      const getAliveIndices = () => {
+        return state.players
+          .map((_, idx) => idx)
+          .filter((idx) => state.alive[idx]);
+      };
+
       const updateTurnView = () => {
-        el.turnName.textContent = state.players[state.current] || "-";
+        const currentName = state.current >= 0 ? state.players[state.current] : "-";
+        el.turnName.textContent = currentName || "-";
         el.turnCount.textContent = String(state.turn);
       };
 
       const updateProgressView = () => {
-        const target = state.gcTarget > 0 ? state.gcTarget : "-";
-        el.gcProgress.textContent = `${state.gcProgress} / ${target}`;
+        const target = state.failTarget > 0 ? state.failTarget : "-";
+        el.gcProgress.textContent = `${state.failProgress} / ${target}`;
       };
 
       const renderScoreBoard = () => {
@@ -504,11 +629,26 @@ Carol</textarea>
           el.scoreBoard.textContent = "Appears after game start.";
           return;
         }
-        const lines = state.players.map((name, idx) => {
+        const alive = getAliveIndices();
+        const lines = [];
+        if (state.gameOver) {
+          if (alive.length === 1) {
+            lines.push(`🏆 WINNER: ${state.players[alive[0]]}`);
+          } else {
+            lines.push("🤝 NO WINNER");
+          }
+          lines.push("");
+        }
+        const statusLines = state.players.map((name, idx) => {
           const pointer = (!state.gameOver && idx === state.current) ? ">" : " ";
-          return `${pointer} ${name}: ${state.scores[name] ?? 0}`;
+          if (state.gameOver && state.alive[idx] && alive.length === 1) {
+            return `${pointer} ${name}: 🏆 WINNER`;
+          }
+          if (state.alive[idx]) return `${pointer} ${name}: ✅ ALIVE`;
+          const reason = state.outReason[idx] ? ` (${state.outReason[idx]})` : "";
+          return `${pointer} ${name}: ❌ OUT${reason}`;
         });
-        el.scoreBoard.textContent = lines.join("\n");
+        el.scoreBoard.textContent = [...lines, ...statusLines].join("\n");
       };
 
       const parsePlayers = () => {
@@ -518,6 +658,89 @@ Carol</textarea>
           .filter(Boolean);
       };
 
+      const buildRoundQueue = () => {
+        const alive = getAliveIndices();
+        if (alive.length === 0) {
+          state.roundQueue = [];
+          state.current = -1;
+          return;
+        }
+        state.round += 1;
+        state.roundQueue = state.direction === 1 ? alive : [...alive].reverse();
+        appendLog(`[round ${state.round}] ${state.roundQueue.map((idx) => state.players[idx]).join(" -> ")}`);
+      };
+
+      const ensureCurrentTurn = () => {
+        while (state.roundQueue.length > 0 && !state.alive[state.roundQueue[0]]) {
+          state.roundQueue.shift();
+        }
+        if (state.roundQueue.length === 0) {
+          buildRoundQueue();
+        }
+        while (state.roundQueue.length > 0 && !state.alive[state.roundQueue[0]]) {
+          state.roundQueue.shift();
+        }
+        state.current = state.roundQueue.length > 0 ? state.roundQueue[0] : -1;
+      };
+
+      const advanceTurn = () => {
+        if (state.roundQueue.length > 0) state.roundQueue.shift();
+        while (state.roundQueue.length > 0 && !state.alive[state.roundQueue[0]]) {
+          state.roundQueue.shift();
+        }
+        if (state.roundQueue.length === 0) {
+          state.direction *= -1;
+        }
+        ensureCurrentTurn();
+      };
+
+      const eliminatePlayer = (idx, reason) => {
+        if (!state.alive[idx]) return false;
+        state.alive[idx] = false;
+        state.outReason[idx] = reason;
+        state.failProgress += 1;
+        return true;
+      };
+
+      const clearOutFx = () => {
+        if (state.outFxTimer) {
+          clearTimeout(state.outFxTimer);
+          state.outFxTimer = null;
+        }
+        el.outFx.classList.remove("active");
+        el.outFx.setAttribute("aria-hidden", "true");
+        el.outShards.textContent = "";
+        el.outLabel.textContent = "";
+      };
+
+      const showOutFx = () => {
+        clearOutFx();
+        el.outLabel.textContent = "💥 OUT!";
+        const colors = ["#ffd166", "#ff7b00", "#ff3b30", "#d7263d", "#f8f9fa"];
+        for (let i = 0; i < 28; i += 1) {
+          const piece = document.createElement("div");
+          piece.className = "out-shard";
+          const angle = (Math.PI * 2 * i) / 28 + (Math.random() - 0.5) * 0.32;
+          const dist = 80 + Math.random() * 220;
+          const dx = Math.cos(angle) * dist;
+          const dy = Math.sin(angle) * dist;
+          piece.style.setProperty("--dx", `${dx.toFixed(1)}px`);
+          piece.style.setProperty("--dy", `${dy.toFixed(1)}px`);
+          piece.style.setProperty("--rot", `${Math.round((Math.random() - 0.5) * 900)}deg`);
+          piece.style.background = colors[i % colors.length];
+          piece.style.animationDelay = `${Math.random() * 22}ms`;
+          el.outShards.appendChild(piece);
+        }
+        void el.outFx.offsetWidth;
+        el.outFx.classList.add("active");
+        el.outFx.setAttribute("aria-hidden", "false");
+        state.outFxTimer = setTimeout(() => {
+          clearOutFx();
+        }, 380);
+      };
+
+      const waitOutFx = () => new Promise((resolve) => setTimeout(resolve, OUT_FX_HOLD_MS));
+
       const clearFinishFx = () => {
         if (state.finishFxTimer) {
           clearTimeout(state.finishFxTimer);
@@ -525,66 +748,71 @@ Carol</textarea>
         }
         el.finishFx.classList.remove("active");
         el.finishFx.setAttribute("aria-hidden", "true");
-        el.finishConfetti.textContent = "";
-        el.finishTitle.textContent = "FAILED!";
+        el.finishTitle.textContent = "GAME OVER";
         el.finishSub.textContent = "";
         el.finishDetail.textContent = "";
       };
 
-      const showFinishFx = (summary, reasonText, failedPlayer) => {
+      const showFinishFx = (summary, reasonText) => {
         clearFinishFx();
-        const { winners, maxScore, entries } = summary;
-        const winnerText = winners.length > 1 ? `Top score tie: ${winners.join(" / ")}` : `Top score: ${winners[0]}`;
-        el.finishTitle.textContent = `${failedPlayer} FAILED!`;
+        const { survivors, statuses } = summary;
+        const survivorText = survivors.length === 0
+          ? "No survivors"
+          : survivors.length === 1
+            ? `Survivor: ${survivors[0]}`
+            : `Survivors: ${survivors.join(" / ")}`;
+        el.finishTitle.textContent = "GAME OVER";
         el.finishSub.textContent = reasonText;
-        el.finishDetail.textContent = `${winnerText} (${maxScore}) | ${entries.map((e) => `${e.name}: ${e.score}`).join(" | ")}`;
-
-        const colors = ["#ff3b30", "#d7263d", "#8d99ae", "#2b2d42", "#edf2f4"];
-        for (let i = 0; i < 42; i += 1) {
-          const piece = document.createElement("div");
-          piece.className = "finish-piece";
-          piece.style.left = `${Math.random() * 100}%`;
-          piece.style.background = colors[i % colors.length];
-          piece.style.animationDuration = `${1.8 + Math.random() * 1.7}s, ${0.55 + Math.random() * 0.75}s`;
-          piece.style.animationDelay = `${Math.random() * 0.45}s, 0s`;
-          piece.style.transform = `rotate(${Math.random() * 360}deg)`;
-          piece.style.opacity = `${0.55 + Math.random() * 0.35}`;
-          el.finishConfetti.appendChild(piece);
-        }
+        el.finishDetail.textContent = `${survivorText} | ${statuses.join(" | ")}`;
 
         el.finishFx.classList.add("active");
         el.finishFx.setAttribute("aria-hidden", "false");
         state.finishFxTimer = setTimeout(() => {
           el.finishFx.classList.remove("active");
           el.finishFx.setAttribute("aria-hidden", "true");
-          el.finishConfetti.textContent = "";
           state.finishFxTimer = null;
         }, 4600);
       };
 
       const announceResults = () => {
-        const entries = state.players.map((name) => ({
-          name,
-          score: state.scores[name] || 0
-        }));
-        const maxScore = Math.max(...entries.map((e) => e.score));
-        const winners = entries.filter((e) => e.score === maxScore).map((e) => e.name);
-        appendLog(`[scores] ${entries.map((e) => `${e.name}=${e.score}`).join(", ")}`);
-        if (winners.length === 1) {
-          appendLog(`[WIN] ${winners[0]} (${maxScore})`);
+        const alive = getAliveIndices();
+        const survivors = alive.map((idx) => state.players[idx]);
+        const statuses = state.players.map((name, idx) => {
+          return state.alive[idx] ? `${name}:ALIVE` : `${name}:OUT${state.outReason[idx] ? `(${state.outReason[idx]})` : ""}`;
+        });
+        appendLog(`[status] ${statuses.join(", ")}`);
+        if (survivors.length === 1) {
+          appendLog(`[WIN] ${survivors[0]} is the last survivor`);
+        } else if (survivors.length === 0) {
+          appendLog("[DRAW] no survivors");
         } else {
-          appendLog(`[TIE] ${winners.join(", ")} (${maxScore})`);
+          appendLog(`[SURVIVORS] ${survivors.join(", ")}`);
         }
-        return { entries, winners, maxScore };
+        return { survivors, statuses };
       };
 
-      const endGameWithZero = (player, reasonLog, fxReason) => {
+      const shouldEndGame = () => {
+        return getAliveIndices().length <= 1;
+      };
+
+      const restoreRubyWorkerFromHistory = async () => {
+        el.bootState.textContent = "Rebuilding Ruby VM...";
+        await initRubyWorker();
+        for (const line of state.executedLines) {
+          await sendWorkerCommand("run_line", { code: line }, 1500);
+        }
+        const readyText = formatRubyInfo();
+        el.bootState.textContent = readyText;
+        appendLog("[system] Ruby VM restored after timeout.");
+      };
+
+      const endGame = (reasonLog) => {
         state.gameOver = true;
-        state.scores[player] = 0;
+        clearOutFx();
+        clearFinishFx();
         renderScoreBoard();
         appendLog(reasonLog);
-        const summary = announceResults();
-        showFinishFx(summary, fxReason, player);
+        announceResults();
         setSyntax("Game Over", false);
         el.runBtn.disabled = true;
         el.lineInput.disabled = true;
@@ -825,9 +1053,15 @@ self.onmessage = (event) => {
           appendLog("[system] Ruby VM is not ready.");
           return;
         }
+        ensureCurrentTurn();
+        if (state.current < 0 || !state.alive[state.current]) {
+          appendLog("[system] No active player available.");
+          return;
+        }
 
         const code = el.lineInput.value;
-        const player = state.players[state.current];
+        const currentIdx = state.current;
+        const player = state.players[currentIdx];
         state.runInFlight = true;
         state.turn += 1;
         updateTurnView();
@@ -838,30 +1072,51 @@ self.onmessage = (event) => {
 
         try {
           const result = await sendWorkerCommand("run_line", { code }, EXEC_TIMEOUT_MS);
+          state.executedLines.push(code);
           if (result.status === "ok") {
             appendLog(`=> ${result.value}`);
           } else {
             appendLog(`!! ${result.error}`);
           }
-          state.scores[player] = (state.scores[player] || 0) + (result.alloc_delta || 0);
-          state.gcProgress += (result.gc_delta || 0);
-          appendLog(`[score] allocated +${result.alloc_delta}, GC +${result.gc_delta}`);
           updateGCWindow(result.gc_stat_after);
-          updateProgressView();
-          renderScoreBoard();
-
-          if (state.gcProgress >= state.gcTarget) {
-            endGameWithZero(
-              player,
-              `[LOSE] ${player} triggered the final GC; score reset to 0 (${result.gc_before} -> ${result.gc_after})`,
-              `${player} triggered the final GC and lost all points.`
-            );
+          const gcDelta = Number(result.gc_delta || 0);
+          if (gcDelta > 0) {
+            eliminatePlayer(currentIdx, "GC");
+            showOutFx();
+            appendLog(`💥 [FAIL] ${player} triggered GC (${result.gc_before} -> ${result.gc_after}) and is OUT`);
+            updateProgressView();
+            renderScoreBoard();
+            await waitOutFx();
+            if (shouldEndGame()) {
+              endGame(
+                `[END] ${player} was eliminated by GC`
+              );
+              return;
+            }
+            appendLog(`📉 [progress] failures ${state.failProgress}/${state.failTarget}`);
+            advanceTurn();
+            updateTurnView();
+            renderScoreBoard();
+            el.lineInput.value = "";
+            state.syntaxOK = false;
+            el.runBtn.disabled = true;
+            setSyntax("No input", null);
+            el.lineInput.disabled = false;
+            el.lineInput.focus();
             return;
           }
 
-          appendLog(`[progress] GC count ${result.gc_before} -> ${result.gc_after} | total ${state.gcProgress}/${state.gcTarget}`);
+          appendLog(`🟢 [safe] no GC (${result.gc_before} -> ${result.gc_after})`);
+          updateProgressView();
+          renderScoreBoard();
 
-          state.current = (state.current + 1) % state.players.length;
+          if (state.initialPlayers === 1) {
+            endGame(
+              "[END] Solo mode complete (1 turn)."
+            );
+            return;
+          }
+          advanceTurn();
           updateTurnView();
           renderScoreBoard();
           el.lineInput.value = "";
@@ -872,13 +1127,37 @@ self.onmessage = (event) => {
           el.lineInput.focus();
         } catch (e) {
           if (e && e.code === "TIMEOUT") {
+            eliminatePlayer(currentIdx, "TIMEOUT");
+            showOutFx();
+            updateProgressView();
+            renderScoreBoard();
             destroyWorker("Ruby worker timed out");
             el.bootState.textContent = "Ruby VM stopped (timeout)";
-            endGameWithZero(
-              player,
-              `[LOSE] ${player} exceeded ${(EXEC_TIMEOUT_MS / 1000).toFixed(1)}s execution time; score reset to 0`,
-              `${player} exceeded ${(EXEC_TIMEOUT_MS / 1000).toFixed(1)} seconds and lost all points.`
-            );
+            await waitOutFx();
+            if (shouldEndGame()) {
+              endGame(
+                `[END] ${player} exceeded ${(EXEC_TIMEOUT_MS / 1000).toFixed(1)}s and is OUT`
+              );
+              return;
+            }
+            try {
+              await restoreRubyWorkerFromHistory();
+            } catch (restoreError) {
+              endGame(
+                `[END] ${player} timed out and VM restore failed`
+              );
+              return;
+            }
+            appendLog(`📉 [progress] failures ${state.failProgress}/${state.failTarget}`);
+            advanceTurn();
+            updateTurnView();
+            renderScoreBoard();
+            el.lineInput.value = "";
+            state.syntaxOK = false;
+            el.runBtn.disabled = true;
+            setSyntax("No input", null);
+            el.lineInput.disabled = false;
+            el.lineInput.focus();
             return;
           }
           appendLog(`[system] run failed: ${String(e)}`);
@@ -909,25 +1188,35 @@ self.onmessage = (event) => {
         }
 
         const names = parsePlayers();
-        const targetRaw = Number.parseInt(el.gcTarget.value, 10);
-        const target = Number.isFinite(targetRaw) && targetRaw > 0 ? targetRaw : 1;
-        el.gcTarget.value = String(target);
-        if (names.length < 2) {
-          appendLog("[system] At least 2 players are required.");
+        const target = Math.max(1, names.length - 1);
+        if (names.length < 1) {
+          appendLog("[system] At least 1 player is required.");
           return;
         }
         state.players = names;
-        state.current = 0;
+        state.current = -1;
         state.turn = 0;
-        state.gcTarget = target;
-        state.gcProgress = 0;
-        state.scores = Object.fromEntries(names.map((name) => [name, 0]));
+        state.failTarget = target;
+        state.failProgress = 0;
+        state.alive = names.map(() => true);
+        state.outReason = names.map(() => "");
+        state.direction = 1;
+        state.round = 0;
+        state.roundQueue = [];
+        state.initialPlayers = names.length;
+        state.executedLines = [];
         state.gameOver = false;
         state.syntaxOK = false;
         state.runInFlight = false;
+        clearOutFx();
         clearFinishFx();
         el.log.textContent = "";
+        appendLog(`[system] Game started: ${names.join(", ")} (n=${target}, failures to end)`);
+        if (names.length === 1) {
+          appendLog("[system] Solo mode: one safe turn ends the game.");
+        }
         updateGCWindow(null);
+        ensureCurrentTurn();
         updateTurnView();
         updateProgressView();
         renderScoreBoard();
@@ -935,19 +1224,26 @@ self.onmessage = (event) => {
         el.lineInput.value = "";
         el.lineInput.disabled = false;
         el.runBtn.disabled = true;
-        appendLog(`[system] Game started: ${names.join(", ")} (target GC: ${target})`);
         el.lineInput.focus();
       };
 
       const resetGame = () => {
         state.players = [];
-        state.current = 0;
+        state.current = -1;
         state.turn = 0;
-        state.gcProgress = 0;
-        state.scores = {};
+        state.failTarget = 1;
+        state.failProgress = 0;
+        state.alive = [];
+        state.outReason = [];
+        state.direction = 1;
+        state.round = 0;
+        state.roundQueue = [];
+        state.initialPlayers = 0;
+        state.executedLines = [];
         state.gameOver = false;
         state.syntaxOK = false;
         state.runInFlight = false;
+        clearOutFx();
         clearFinishFx();
         updateTurnView();
         updateProgressView();

@@ -1,7 +1,8 @@
 # GC Surface Tension Game
 
 A local pass-and-play browser game powered by `ruby.wasm`.  
-Players submit one Ruby line per turn, and the winner is decided by allocation-based scoring with GC-driven end conditions.
+Players submit one Ruby line per turn in a shared VM.  
+If you trigger GC or exceed 3 seconds, you are eliminated.
 
 ## Files
 
@@ -12,7 +13,7 @@ Players submit one Ruby line per turn, and the winner is decided by allocation-b
 
 1. Start a simple local web server in this directory.
 2. Open the app in your browser.
-3. Set player names and GC target count `n`, then start the game.
+3. Set player names, then start the game.
 
 Example:
 
@@ -27,8 +28,8 @@ Open `http://localhost:8000` in your browser.
 
 1. Players take turns entering exactly one line of Ruby.
 2. Lines with syntax errors cannot be submitted.
-3. On each turn, `alloc_delta` is added to the current player's score.
-4. The game ends when total GC progress reaches target `n`.
-5. The player who triggers the final GC gets score `0`.
-6. If a turn takes more than 3 seconds, that player gets score `0`.
-7. The highest score wins (ties are a draw).
+3. If a turn triggers GC, that player is eliminated.
+4. If a turn takes more than 3 seconds, that player is eliminated.
+5. Turn order reverses every round.
+6. Failure target is auto-calculated as `n = max(1, players - 1)`.
+7. Last survivor wins.
