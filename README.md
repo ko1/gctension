@@ -40,4 +40,5 @@ Open `http://localhost:8000` in your browser.
 
 - Right panel shows heap as a live/free bar + recent trend.
 - Live/free are shown only as integer percentages.
+- Current `GC count` is shown.
 - `heap_available_slots` is shown as a numeric value.

@@ -68,8 +68,9 @@ The UI also visualizes heap state (bar/trend) instead of showing raw `GC.stat` d
    - stacked bar ratio
    - integer percentages (`live xx% / free yy%`)
 3. Raw live/free slot counts are not shown.
-4. `heap_available_slots` numeric value is shown.
-5. Recent turns are shown as a compact trend bar chart.
+4. Current `GC.stat[:count]` is shown as `GC count`.
+5. `heap_available_slots` numeric value is shown.
+6. Recent turns are shown as a compact trend bar chart.
 
 ## 7. Technical Constraints
 
